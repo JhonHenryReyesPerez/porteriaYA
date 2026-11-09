@@ -21,6 +21,8 @@ public interface AutorizacionRepository extends JpaRepository<Autorizacion, Long
 
     List<Autorizacion> findByEstadoAndValidaHastaBefore(EstadoAutorizacion estado, Instant momento);
 
+    long countByEstado(EstadoAutorizacion estado);
+
     /**
      * Paso 3 de la validacion (§6): descuenta un uso con una sola sentencia
      * atomica. Devuelve las filas afectadas; 0 significa usos agotados y el

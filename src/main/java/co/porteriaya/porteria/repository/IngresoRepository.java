@@ -40,6 +40,11 @@ public interface IngresoRepository extends JpaRepository<Ingreso, Long> {
             """)
     List<Ingreso> dentroSinAvisarDePermanencia();
 
+    long countByEstado(EstadoIngreso estado);
+
+    /** Para el grafico de visitas por hora del panel (§13). */
+    List<Ingreso> findByIngresoEnGreaterThanEqual(java.time.Instant desde);
+
     /** Todos los que siguen dentro, para el cierre de medianoche (§9). */
     @Query("""
             select i from Ingreso i

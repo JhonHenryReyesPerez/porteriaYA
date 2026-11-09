@@ -124,6 +124,29 @@ public class AutorizacionService {
         return RespuestaAutorizacion.de(autorizacion);
     }
 
+    /**
+     * Tarea de §9: las autorizaciones cuya ventana ya termino pasan a VENCIDA.
+     *
+     * Idempotente por el filtro de estado: solo mira las ACTIVA, asi que una
+     * segunda pasada no encuentra nada que hacer.
+     *
+     * Ojo con los recurrentes: aqui se compara contra validaHasta, que es el
+     * fin del periodo completo (meses), no contra la franja del dia. Un
+     * servicio recurrente no vence por ser martes.
+     */
+    @Transactional
+    public int vencerLasQueTerminaron() {
+        List<Autorizacion> terminadas = autorizaciones.findByEstadoAndValidaHastaBefore(
+                EstadoAutorizacion.ACTIVA, clock.instant());
+
+        terminadas.forEach(a -> a.cambiarEstado(EstadoAutorizacion.VENCIDA));
+
+        if (!terminadas.isEmpty()) {
+            log.info("{} autorizaciones pasaron a VENCIDA", terminadas.size());
+        }
+        return terminadas.size();
+    }
+
     private Residente resolverResidente(String actor) {
         if (actor == null || !actor.contains("-")) {
             throw new SolicitudInvalidaException(
