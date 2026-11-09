@@ -49,7 +49,7 @@ no en `localhost`. Esa URL sale de `PORTERIA_BASE_URL` en `.env`.
 ## Las tres vistas
 
 - **`/residente.html`** — crear autorizaciones (con su código y QR), ver las propias, cancelarlas,
-  consultar paquetes y preguntarle al asistente.
+  consultar paquetes, gestionar quién puede retirarlos y preguntarle al asistente.
 - **`/porteria.html`** — pensada para tablet. Validar código, registrar ingreso y salida, visita no
   anunciada, recibir y entregar paquetes, ver quién está dentro, consultar protocolos.
 - **`/admin.html`** — métricas, visitas por hora, paquetes por antigüedad, gestión de documentos del
@@ -106,6 +106,13 @@ Tres guardrails que no son opcionales:
 
 PostgreSQL es la fuente de verdad: guarda el texto extraído, así que `POST /api/rag/reindexar`
 reconstruye Qdrant sin volver a subir ningún archivo.
+
+**La indexación arranca después del commit del documento**, no durante. Lanzarla desde dentro de la
+transacción de la ingesta parecía funcionar y no funcionaba: el hilo `@Async` salía antes de que la
+fila estuviera confirmada, `findById` no la encontraba y el documento se quedaba en `SUBIDO` para
+siempre, con un aviso en el log como única señal. Afectaba a toda primera indexación, incluida la
+semilla de la demo. Ahora va por un evento `AFTER_COMMIT`, el mismo mecanismo que los avisos a n8n y
+por la misma razón: el trabajo que depende de un hecho no empieza hasta que el hecho es cierto.
 
 Proveedores detrás de interfaces (`EmbeddingClient`, `VectorStore`, `LlmClient`): cambiar de LLM es
 una propiedad. **Para una sustentación en vivo, `RAG_LLM_PROVEEDOR=claude`**: un modelo generativo
@@ -184,6 +191,30 @@ los protocolos de vigilancia.
 
 Las clases `*IT` son las de integración y solo corren en `verify`.
 
+### Evaluación del asistente
+
+`RagEvaluacionIT` es el instrumento de calibración que pide §11. Mide dos cosas que tiran en
+direcciones opuestas:
+
+1. **recall@5** sobre 20 preguntas: cuántas recuperan su documento entre los cinco chunks.
+2. Que 5 preguntas que los documentos **no** responden queden **bajo** el umbral.
+
+Mirar solo la primera cifra lleva a bajar `rag.umbral` hasta que todo «funciona» — y un asistente
+que contesta siempre es exactamente el que se inventa una norma.
+
+```bash
+docker compose up -d qdrant
+docker compose up -d ollama
+docker compose exec ollama ollama pull nomic-embed-text
+./mvnw verify -Dit.test=RagEvaluacionIT
+```
+
+Necesita Ollama y Qdrant de verdad, porque son justo las piezas que mide. Si alguna no responde la
+clase **se salta** en lugar de fallar, así que `./mvnw verify` sigue en verde sin Ollama cargado en
+RAM. Usa su propia colección de Qdrant y la borra al empezar, para no mezclarse con los documentos
+de desarrollo. Las preguntas están en `src/test/resources/rag/evaluacion.csv` y se editan sin tocar
+código.
+
 ### Estado de verificación
 
 Es un MVP y no la entrega final. Lo que está comprobado y lo que no:
@@ -196,7 +227,8 @@ Es un MVP y no la entrega final. Lo que está comprobado y lo que no:
 | `./mvnw verify` para los pasos 3 y 4 | ⚠️ **sin ejecutar**: Docker estaba abajo |
 | RAG y las cuatro vistas | ⚠️ **sin probar contra el sistema real** |
 | Los ocho flujos de n8n | ⚠️ **nunca importados en n8n**: el JSON es válido y el JS de los nodos Code compila, pero las versiones de nodo y las expresiones no se han comprobado dentro de n8n |
-| Evaluación RAG de 20 preguntas (`CLAUDE.md` §11) | ⚠️ sin escribir; el umbral `0.55` está sin calibrar |
+| Evaluación RAG de 20 preguntas (`CLAUDE.md` §11) | ⚠️ **escrita y sin ejecutar**: necesita Ollama y Qdrant, así que `rag.umbral = 0.55` sigue sin calibrar |
+| `AutorizadoRetiroIT` | ⚠️ **escrito y sin ejecutar**: Docker estaba abajo |
 | `POST /api/demo/avanzar` | ⚠️ sin prueba automática |
 
 **Lo primero al retomar:** levantar Docker y correr `./mvnw verify`, luego recorrer el guion de demo
