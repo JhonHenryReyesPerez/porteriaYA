@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portería · PorteriaYa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+</head>
+<!-- Pensada para tablet: tipografía grande y objetivos táctiles amplios (§13) -->
+<body class="bg-slate-100 min-h-screen text-[17px]">
+  <header class="bg-slate-900 text-white">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="font-bold text-xl">Portería</h1>
+        <p class="text-sm text-slate-300"><span id="vigilante"></span></p>
+      </div>
+      <a href="/index.html" class="text-sm text-slate-300 hover:text-white">Cambiar</a>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+    <div id="aviso" class="hidden"></div>
+
+    <!-- ------------------------------------------------- validar un código -->
+    <section class="bg-white rounded-xl shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 text-lg mb-1">Validar código</h2>
+      <p class="text-sm text-slate-500 mb-4">
+        Validar no gasta el uso: puedes consultar sin consecuencias. El ingreso se registra aparte.
+      </p>
+      <div class="grid sm:grid-cols-3 gap-3 mb-4">
+        <input id="codigo" inputmode="numeric" maxlength="6" placeholder="Código de 6 dígitos"
+               class="border border-slate-300 rounded-lg px-4 py-4 text-2xl font-mono tracking-widest text-center">
+        <input id="vNombre" placeholder="Nombre del visitante"
+               class="border border-slate-300 rounded-lg px-4 py-4">
+        <input id="vDoc4" inputmode="numeric" maxlength="4" placeholder="4 dígitos del documento"
+               class="border border-slate-300 rounded-lg px-4 py-4">
+      </div>
+      <button id="btnValidar"
+              class="w-full bg-slate-900 text-white rounded-lg py-5 text-lg font-semibold hover:bg-slate-800">
+        Validar
+      </button>
+      <div id="resultado" class="hidden mt-4"></div>
+    </section>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- --------------------------------------------- visita no anunciada -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 text-lg mb-1">Visita no anunciada</h2>
+        <p class="text-sm text-slate-500 mb-4">
+          Se le pide aprobación al residente. Nadie entra hasta que apruebe.
+        </p>
+        <form id="formSolicitud" class="space-y-3">
+          <select id="sApto" class="w-full border border-slate-300 rounded-lg px-4 py-3">
+            <option value="">Apartamento…</option>
+          </select>
+          <input id="sNombre" required placeholder="Nombre del visitante"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <input id="sDoc4" inputmode="numeric" maxlength="4" placeholder="4 dígitos del documento"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <input id="sMotivo" placeholder="Motivo (opcional)"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <button class="w-full bg-slate-900 text-white rounded-lg py-4 font-semibold hover:bg-slate-800">
+            Pedir aprobación
+          </button>
+        </form>
+        <div id="pendientes" class="mt-4 space-y-2 text-sm"></div>
+      </section>
+
+      <!-- ------------------------------------------------------- paquetes -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 text-lg mb-4">Recibir paquete</h2>
+        <form id="formPaquete" class="space-y-3 mb-6">
+          <select id="pApto" class="w-full border border-slate-300 rounded-lg px-4 py-3">
+            <option value="">Apartamento…</option>
+          </select>
+          <input id="pDescripcion" required placeholder="Descripción"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <input id="pRemitente" placeholder="Remitente (opcional)"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <button class="w-full bg-slate-900 text-white rounded-lg py-4 font-semibold hover:bg-slate-800">
+            Registrar paquete
+          </button>
+        </form>
+
+        <h2 class="font-semibold text-slate-900 text-lg mb-3 border-t border-slate-200 pt-4">
+          Entregar paquete
+        </h2>
+        <form id="formEntrega" class="space-y-3">
+          <input id="ePaqueteId" type="number" required placeholder="Id del paquete"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <input id="eCodigo" inputmode="numeric" maxlength="6" placeholder="Código de retiro"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <input id="ePersona" placeholder="O nombre de persona autorizada"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <input id="eDoc4" inputmode="numeric" maxlength="4" placeholder="4 dígitos de esa persona"
+                 class="w-full border border-slate-300 rounded-lg px-4 py-3">
+          <button class="w-full bg-slate-900 text-white rounded-lg py-4 font-semibold hover:bg-slate-800">
+            Entregar
+          </button>
+        </form>
+      </section>
+    </div>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- -------------------------------------------------- quién está dentro -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 text-lg mb-4">Quién está dentro</h2>
+        <div id="dentro" class="space-y-2 text-sm text-slate-500">Cargando…</div>
+      </section>
+
+      <!-- --------------------------------------------- paquetes pendientes -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 text-lg mb-4">Paquetes pendientes</h2>
+        <div id="paquetesPendientes" class="space-y-2 text-sm text-slate-500">Cargando…</div>
+      </section>
+    </div>
+
+    <!-- --------------------------------------------------- chat de protocolos -->
+    <section class="bg-white rounded-xl shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 text-lg mb-1">Consultar protocolos</h2>
+      <p class="text-sm text-slate-500 mb-4">Responde con el protocolo de portería y lo cita.</p>
+      <div id="hilo" class="space-y-3 max-h-80 overflow-y-auto mb-4 flex flex-col"></div>
+      <form id="formChat" class="flex gap-2">
+        <input id="pregunta" placeholder="¿Qué hago si alguien está en la lista de no permitidos?"
+               class="flex-1 border border-slate-300 rounded-lg px-4 py-3">
+        <button class="bg-slate-900 text-white rounded-lg px-6 font-semibold hover:bg-slate-800">
+          Preguntar
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    if (Sesion.exigir('VIGILANTE')) {
+      document.getElementById('vigilante').textContent = Sesion.actor();
+      arrancar();
+    }
+
+    let ultimaValidacion = null;
+
+    function arrancar() {
+      cargarApartamentos();
+      cargarDentro();
+      cargarPaquetesPendientes();
+      cargarPendientes();
+      montarChat({ hiloId: 'hilo', formId: 'formChat', entradaId: 'pregunta' });
+
+      document.getElementById('btnValidar').addEventListener('click', validar);
+      document.getElementById('formSolicitud').addEventListener('submit', crearSolicitud);
+      document.getElementById('formPaquete').addEventListener('submit', recibirPaquete);
+      document.getElementById('formEntrega').addEventListener('submit', entregarPaquete);
+    }
+
+    async function cargarApartamentos() {
+      try {
+        const residentes = await Api.get('/api/residentes');
+        const opciones = '<option value="">Apartamento…</option>' + residentes
+          .map((r) => `<option value="${esc(r.identificador)}">${esc(r.identificador)}</option>`).join('');
+        document.getElementById('sApto').innerHTML = opciones;
+        document.getElementById('pApto').innerHTML = opciones;
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    // ------------------------------------------------------------- validar
+
+    async function validar() {
+      limpiarAviso('aviso');
+      const caja = document.getElementById('resultado');
+      const cuerpo = {
+        codigo: document.getElementById('codigo').value.trim(),
+        visitanteNombre: document.getElementById('vNombre').value.trim(),
+        visitanteDoc4: document.getElementById('vDoc4').value || null,
+      };
+
+      try {
+        const r = await Api.post('/api/porteria/validar', cuerpo);
+        ultimaValidacion = { ...cuerpo, advertencias: r.advertencias || [] };
+        caja.classList.remove('hidden');
+
+        if (!r.permitido) {
+          // El motivo se muestra siempre: es lo que le dice al vigilante qué pasó
+          caja.className = 'mt-4 border-2 border-red-300 bg-red-50 rounded-lg p-5';
+          caja.innerHTML = `
+            <p class="text-2xl font-bold text-red-800">NO PERMITIDO</p>
+            <p class="text-red-900 mt-1">Motivo: <strong>${esc(r.motivo)}</strong></p>
+            ${r.detalle ? `<p class="text-red-800 text-sm mt-1">${esc(r.detalle)}</p>` : ''}`;
+          return;
+        }
+
+        const a = r.autorizacion;
+        const usos = a.usosRestantes === null || a.usosRestantes === undefined
+          ? 'ilimitados' : a.usosRestantes;
+
+        let html = `
+          <p class="text-2xl font-bold text-green-800">PERMITIDO</p>
+          <p class="text-slate-700 mt-1">
+            ${esc(a.visitanteNombre)} → <strong>${esc(a.apartamento)}</strong><br>
+            ${esc(a.tipo)} · usos restantes ${esc(usos)} · permanencia esperada ${esc(a.duracionEsperadaMin)} min
+          </p>`;
+
+        if (r.advertencias && r.advertencias.length) {
+          html += `<div class="mt-3 bg-amber-100 border border-amber-300 rounded-lg p-3">
+              <p class="font-semibold text-amber-900">Atención antes de registrar</p>
+              <ul class="list-disc list-inside text-sm text-amber-900 mt-1">
+                ${r.advertencias.map((x) => `<li>${esc(explicar(x))}</li>`).join('')}
+              </ul>
+              ${r.detalle ? `<p class="text-sm text-amber-900 mt-1">${esc(r.detalle)}</p>` : ''}
+            </div>`;
+        }
+
+        html += `<button id="btnIngreso"
+            class="mt-4 w-full bg-green-700 text-white rounded-lg py-4 text-lg font-semibold hover:bg-green-800">
+            ${r.advertencias && r.advertencias.length ? 'Confirmar advertencias y registrar ingreso' : 'Registrar ingreso'}
+          </button>`;
+
+        caja.className = 'mt-4 border-2 border-green-300 bg-green-50 rounded-lg p-5';
+        caja.innerHTML = html;
+        document.getElementById('btnIngreso').addEventListener('click', registrarIngreso);
+
+      } catch (e) {
+        caja.classList.remove('hidden');
+        caja.className = 'mt-4 border border-red-200 bg-red-50 rounded-lg p-4 text-sm text-red-800';
+        caja.textContent = textoDeError(e);
+      }
+    }
+
+    function explicar(advertencia) {
+      const textos = {
+        POSIBLE_NO_PERMITIDO: 'Coincide el nombre con la lista de no permitidos, pero no el documento. Verifica antes de autorizar.',
+        YA_DENTRO: 'Esta persona ya figura como dentro con esta misma autorización.',
+      };
+      return textos[advertencia] || advertencia;
+    }
+
+    async function registrarIngreso() {
+      try {
+        await Api.post('/api/porteria/ingresos', {
+          ...ultimaValidacion,
+          confirmaAdvertencias: ultimaValidacion.advertencias.length > 0,
+        });
+        avisar('aviso', 'Ingreso registrado', 'ok');
+        document.getElementById('resultado').classList.add('hidden');
+        document.getElementById('codigo').value = '';
+        document.getElementById('vNombre').value = '';
+        document.getElementById('vDoc4').value = '';
+        cargarDentro();
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    // --------------------------------------------------- visita no anunciada
+
+    async function crearSolicitud(evento) {
+      evento.preventDefault();
+      try {
+        await Api.post('/api/porteria/solicitudes', {
+          apartamento: document.getElementById('sApto').value,
+          visitanteNombre: document.getElementById('sNombre').value.trim(),
+          visitanteDoc4: document.getElementById('sDoc4').value || null,
+          motivo: document.getElementById('sMotivo').value || null,
+        });
+        avisar('aviso', 'Solicitud enviada al residente. Tiene 3 minutos para responder.', 'ok');
+        evento.target.reset();
+        cargarPendientes();
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    async function cargarPendientes() {
+      const caja = document.getElementById('pendientes');
+      try {
+        const pendientes = await Api.get('/api/porteria/solicitudes?estado=PENDIENTE');
+        const sinRespuesta = await Api.get('/api/porteria/solicitudes?estado=SIN_RESPUESTA');
+        let html = '';
+
+        for (const s of pendientes) {
+          html += `<div class="border border-amber-200 bg-amber-50 rounded-lg p-3">
+              <p class="font-medium">${esc(s.visitanteNombre)} → ${esc(s.apartamento)}</p>
+              <p class="text-xs text-amber-900">Esperando respuesta · vence ${esc(hora(s.venceEn))}</p>
+            </div>`;
+        }
+        // Sin respuesta: aquí decide el vigilante (§6)
+        for (const s of sinRespuesta) {
+          html += `<div class="border border-slate-300 rounded-lg p-3">
+              <p class="font-medium">${esc(s.visitanteNombre)} → ${esc(s.apartamento)}</p>
+              <p class="text-xs text-slate-500 mb-2">El residente no respondió. Decides tú.</p>
+              <div class="flex gap-2">
+                <button data-decidir="${esc(s.id)}" data-accion="APROBAR"
+                        class="flex-1 bg-green-700 text-white rounded-lg py-2 text-sm font-medium">Autorizar</button>
+                <button data-decidir="${esc(s.id)}" data-accion="RECHAZAR"
+                        class="flex-1 bg-red-700 text-white rounded-lg py-2 text-sm font-medium">Denegar</button>
+              </div>
+            </div>`;
+        }
+        caja.innerHTML = html;
+
+        caja.querySelectorAll('[data-decidir]').forEach((boton) => {
+          boton.addEventListener('click', async () => {
+            try {
+              await Api.patch(`/api/porteria/solicitudes/${boton.dataset.decidir}/decision?accion=${boton.dataset.accion}`);
+              avisar('aviso', 'Decisión registrada', 'ok');
+              cargarPendientes();
+              cargarDentro();
+            } catch (e) {
+              avisar('aviso', textoDeError(e));
+            }
+          });
+        });
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    // ------------------------------------------------------------- paquetes
+
+    async function recibirPaquete(evento) {
+      evento.preventDefault();
+      try {
+        const p = await Api.post('/api/paquetes', {
+          apartamento: document.getElementById('pApto').value,
+          descripcion: document.getElementById('pDescripcion').value.trim(),
+          remitente: document.getElementById('pRemitente').value || null,
+        });
+        avisar('aviso', `Paquete ${p.id} registrado. El código de retiro va al correo del residente.`, 'ok');
+        evento.target.reset();
+        cargarPaquetesPendientes();
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    async function entregarPaquete(evento) {
+      evento.preventDefault();
+      try {
+        await Api.post(`/api/paquetes/${document.getElementById('ePaqueteId').value}/entregar`, {
+          codigoRetiro: document.getElementById('eCodigo').value || null,
+          retiradoPor: document.getElementById('ePersona').value || null,
+          doc4: document.getElementById('eDoc4').value || null,
+        });
+        avisar('aviso', 'Paquete entregado', 'ok');
+        evento.target.reset();
+        cargarPaquetesPendientes();
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    async function cargarPaquetesPendientes() {
+      const caja = document.getElementById('paquetesPendientes');
+      try {
+        const lista = await Api.get('/api/paquetes?estado=RECIBIDO');
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">Sin paquetes pendientes.</p>';
+          return;
+        }
+        caja.innerHTML = lista.map((p) => {
+          const dias = Math.floor((Date.now() - new Date(p.recibidoEn)) / 86400000);
+          const alerta = p.escalado ? 'border-red-300 bg-red-50'
+            : (p.aviso72h ? 'border-amber-300 bg-amber-50' : 'border-slate-200');
+          return `<div class="border rounded-lg p-3 ${alerta}">
+              <p class="font-medium">#${esc(p.id)} · ${esc(p.descripcion)}</p>
+              <p class="text-xs text-slate-600">${esc(p.apartamento)} · ${esc(dias)} día(s) sin retirar
+                ${p.escalado ? '· <strong>escalado</strong>' : ''}</p>
+            </div>`;
+        }).join('');
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    // ------------------------------------------------------------- dentro
+
+    async function cargarDentro() {
+      const caja = document.getElementById('dentro');
+      try {
+        const lista = await Api.get('/api/porteria/dentro');
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">No hay nadie dentro.</p>';
+          return;
+        }
+        caja.innerHTML = lista.map((i) => `
+          <div class="border rounded-lg p-3 flex items-center justify-between gap-3
+                      ${i.permanenciaAvisada ? 'border-amber-300 bg-amber-50' : 'border-slate-200'}">
+            <div>
+              <p class="font-medium">${esc(i.visitanteNombre)}</p>
+              <p class="text-xs text-slate-600">
+                ${esc(i.apartamento)} · entró ${esc(hora(i.ingresoEn))}
+                ${i.permanenciaAvisada ? '· <strong>permanencia excedida</strong>' : ''}
+              </p>
+            </div>
+            <button data-salida="${esc(i.id)}"
+                    class="bg-slate-900 text-white rounded-lg px-4 py-2 text-sm font-medium">Salida</button>
+          </div>`).join('');
+
+        caja.querySelectorAll('[data-salida]').forEach((boton) => {
+          boton.addEventListener('click', async () => {
+            try {
+              await Api.patch(`/api/porteria/ingresos/${boton.dataset.salida}/salida`);
+              avisar('aviso', 'Salida registrada', 'ok');
+              cargarDentro();
+            } catch (e) {
+              avisar('aviso', textoDeError(e));
+            }
+          });
+        });
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>

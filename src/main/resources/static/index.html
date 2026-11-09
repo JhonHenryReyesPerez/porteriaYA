@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PorteriaYa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <main class="max-w-xl mx-auto px-4 py-10">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-slate-900">PorteriaYa</h1>
+      <p class="text-slate-600 mt-1">Portería digital · Altos del Parque</p>
+    </header>
+
+    <!-- No hay login (§7): esto es un selector de rol, no una autenticación.
+         Se dice en voz alta para que nadie lo confunda. -->
+    <div class="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-900 mb-6">
+      Esta versión no tiene inicio de sesión. El rol que elijas viaja en una cabecera y el
+      servidor lo valida por endpoint, pero <strong>no es un control de identidad</strong>.
+      Las operaciones de administración piden además un PIN.
+    </div>
+
+    <div id="aviso" class="hidden mb-4"></div>
+
+    <section class="bg-white rounded-xl shadow-sm p-6 mb-4">
+      <h2 class="font-semibold text-slate-900 mb-4">Soy residente</h2>
+      <label class="block text-sm text-slate-600 mb-1" for="apartamento">Torre y apartamento</label>
+      <select id="apartamento" class="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4">
+        <option value="">Cargando…</option>
+      </select>
+      <button id="entrarResidente"
+              class="w-full bg-slate-900 text-white rounded-lg py-3 font-medium hover:bg-slate-800">
+        Entrar como residente
+      </button>
+    </section>
+
+    <section class="bg-white rounded-xl shadow-sm p-6 mb-4">
+      <h2 class="font-semibold text-slate-900 mb-4">Soy vigilante</h2>
+      <label class="block text-sm text-slate-600 mb-1" for="vigilante">Nombre y turno</label>
+      <input id="vigilante" type="text" placeholder="vigilante1 · turno día"
+             class="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4">
+      <button id="entrarVigilante"
+              class="w-full bg-slate-900 text-white rounded-lg py-3 font-medium hover:bg-slate-800">
+        Entrar como vigilante
+      </button>
+    </section>
+
+    <section class="bg-white rounded-xl shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 mb-4">Soy administrador</h2>
+      <label class="block text-sm text-slate-600 mb-1" for="admin">Nombre</label>
+      <input id="admin" type="text" placeholder="admin1"
+             class="w-full border border-slate-300 rounded-lg px-3 py-2 mb-3">
+      <label class="block text-sm text-slate-600 mb-1" for="pin">PIN de administrador</label>
+      <input id="pin" type="password" placeholder="El de ADMIN_PIN en .env"
+             class="w-full border border-slate-300 rounded-lg px-3 py-2 mb-4">
+      <button id="entrarAdmin"
+              class="w-full bg-slate-900 text-white rounded-lg py-3 font-medium hover:bg-slate-800">
+        Entrar como administrador
+      </button>
+    </section>
+  </main>
+
+  <script>
+    Sesion.limpiar();
+
+    // El selector necesita la lista de apartamentos antes de que haya rol
+    // alguno, y por eso GET /api/residentes no pide cabeceras (§8).
+    (async function cargarApartamentos() {
+      const select = document.getElementById('apartamento');
+      try {
+        const residentes = await Api.get('/api/residentes');
+        if (!residentes.length) {
+          select.innerHTML = '<option value="">No hay apartamentos registrados</option>';
+          avisar('aviso', 'No hay apartamentos. Arranca con el perfil demo para tener datos de ejemplo.', 'aviso');
+          return;
+        }
+        select.innerHTML = residentes
+          .map((r) => `<option value="${esc(r.identificador)}">${esc(r.identificador)} — ${esc(r.nombre)}</option>`)
+          .join('');
+      } catch (e) {
+        select.innerHTML = '<option value="">Error al cargar</option>';
+        avisar('aviso', textoDeError(e));
+      }
+    })();
+
+    document.getElementById('entrarResidente').addEventListener('click', () => {
+      const apto = document.getElementById('apartamento').value;
+      if (!apto) return avisar('aviso', 'Elige un apartamento');
+      Sesion.guardar('RESIDENTE', apto, '');
+      window.location.href = '/residente.html';
+    });
+
+    document.getElementById('entrarVigilante').addEventListener('click', () => {
+      const nombre = document.getElementById('vigilante').value.trim();
+      if (!nombre) return avisar('aviso', 'Escribe tu nombre y turno');
+      Sesion.guardar('VIGILANTE', nombre, '');
+      window.location.href = '/porteria.html';
+    });
+
+    document.getElementById('entrarAdmin').addEventListener('click', () => {
+      const nombre = document.getElementById('admin').value.trim();
+      const pin = document.getElementById('pin').value;
+      if (!nombre) return avisar('aviso', 'Escribe tu nombre');
+      if (!pin) return avisar('aviso', 'El PIN es obligatorio para administración');
+      Sesion.guardar('ADMINISTRADOR', nombre, pin);
+      window.location.href = '/admin.html';
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Administración · PorteriaYa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="/js/api.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="font-bold text-slate-900">Administración</h1>
+        <p class="text-sm text-slate-500"><span id="admin"></span></p>
+      </div>
+      <a href="/index.html" class="text-sm text-slate-500 hover:text-slate-900">Salir</a>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+    <div id="aviso" class="hidden"></div>
+
+    <!-- ------------------------------------------------------- tarjetas -->
+    <section id="tarjetas" class="grid grid-cols-2 lg:grid-cols-4 gap-4"></section>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- --------------------------------------------- visitas por hora -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Visitas por hora (hoy)</h2>
+        <canvas id="grafico" height="140"></canvas>
+      </section>
+
+      <!-- ----------------------------------------- paquetes por antigüedad -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-1">Paquetes por antigüedad</h2>
+        <p class="text-xs text-slate-500 mb-4">
+          Los tramos coinciden con los hitos de aviso: lo que está en «más de 7 días» ya se escaló.
+        </p>
+        <div id="antiguedad" class="space-y-2"></div>
+      </section>
+    </div>
+
+    <!-- ----------------------------------------------------- documentos -->
+    <section class="bg-white rounded-xl shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 mb-4">Documentos del asistente</h2>
+      <form id="formDocumento" class="grid sm:grid-cols-5 gap-3 mb-4">
+        <input id="dTitulo" required placeholder="Título"
+               class="sm:col-span-2 border border-slate-300 rounded-lg px-3 py-2">
+        <select id="dTipo" class="border border-slate-300 rounded-lg px-3 py-2">
+          <option value="REGLAMENTO">Reglamento</option>
+          <option value="PROTOCOLO">Protocolo</option>
+          <option value="CIRCULAR">Circular</option>
+          <option value="FAQ">FAQ</option>
+        </select>
+        <select id="dAudiencia" class="border border-slate-300 rounded-lg px-3 py-2">
+          <option value="TODOS">Todos</option>
+          <option value="RESIDENTE">Solo residentes</option>
+          <option value="VIGILANTE,ADMINISTRADOR">Vigilancia y administración</option>
+          <option value="ADMINISTRADOR">Solo administración</option>
+        </select>
+        <input id="dArchivo" type="file" required accept=".pdf,.md,.markdown,.txt"
+               class="sm:col-span-4 border border-slate-300 rounded-lg px-3 py-2 text-sm">
+        <button class="bg-slate-900 text-white rounded-lg py-2 font-medium hover:bg-slate-800">
+          Subir
+        </button>
+      </form>
+      <div class="flex items-center justify-between mb-3">
+        <p id="estadoRag" class="text-xs text-slate-500"></p>
+        <button id="btnReindexar" class="text-sm text-slate-600 hover:underline">Reindexar todo</button>
+      </div>
+      <div id="documentos" class="space-y-2 text-sm text-slate-500">Cargando…</div>
+    </section>
+
+    <div class="grid lg:grid-cols-2 gap-6">
+      <!-- ---------------------------------------- preguntas sin respuesta -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-1">Preguntas sin respuesta</h2>
+        <p class="text-xs text-slate-500 mb-4">
+          Lo que el asistente no encontró: la lista de lo que convendría documentar.
+        </p>
+        <div id="sinRespuesta" class="space-y-2 text-sm text-slate-500">Cargando…</div>
+      </section>
+
+      <!-- -------------------------------------------------- no permitidos -->
+      <section class="bg-white rounded-xl shadow-sm p-6">
+        <h2 class="font-semibold text-slate-900 mb-4">Lista de no permitidos</h2>
+        <form id="formNoPermitido" class="space-y-2 mb-4">
+          <div class="grid grid-cols-3 gap-2">
+            <input id="nNombre" required placeholder="Nombre"
+                   class="col-span-2 border border-slate-300 rounded-lg px-3 py-2">
+            <input id="nDoc4" inputmode="numeric" maxlength="4" placeholder="4 díg."
+                   class="border border-slate-300 rounded-lg px-3 py-2">
+          </div>
+          <input id="nMotivo" required placeholder="Motivo"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2">
+          <p class="text-xs text-slate-500">
+            Sin los 4 dígitos el sistema solo puede avisar al vigilante, nunca negar automáticamente.
+          </p>
+          <button class="w-full bg-slate-900 text-white rounded-lg py-2 font-medium hover:bg-slate-800">
+            Añadir
+          </button>
+        </form>
+        <div id="noPermitidos" class="space-y-2 text-sm text-slate-500">Cargando…</div>
+      </section>
+    </div>
+
+    <!-- -------------------------------------------------------- bitácora -->
+    <section class="bg-white rounded-xl shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 mb-1">Bitácora</h2>
+      <p class="text-xs text-slate-500 mb-4">Solo lectura: no se puede editar ni borrar desde la API.</p>
+      <div class="grid sm:grid-cols-4 gap-3 mb-4">
+        <input id="bActor" placeholder="Actor" class="border border-slate-300 rounded-lg px-3 py-2">
+        <input id="bEntidad" placeholder="Entidad" class="border border-slate-300 rounded-lg px-3 py-2">
+        <input id="bDesde" type="datetime-local" class="border border-slate-300 rounded-lg px-3 py-2">
+        <button id="btnBitacora" class="bg-slate-900 text-white rounded-lg py-2 font-medium">Filtrar</button>
+      </div>
+      <div id="bitacora" class="space-y-1 text-sm text-slate-500 max-h-96 overflow-y-auto">Cargando…</div>
+    </section>
+  </main>
+
+  <script>
+    if (Sesion.exigir('ADMINISTRADOR')) {
+      document.getElementById('admin').textContent = Sesion.actor();
+      arrancar();
+    }
+
+    let grafico = null;
+
+    function arrancar() {
+      cargarStats();
+      cargarDocumentos();
+      cargarSinRespuesta();
+      cargarNoPermitidos();
+      cargarBitacora();
+      cargarEstadoRag();
+
+      document.getElementById('formDocumento').addEventListener('submit', subirDocumento);
+      document.getElementById('formNoPermitido').addEventListener('submit', anadirNoPermitido);
+      document.getElementById('btnBitacora').addEventListener('click', cargarBitacora);
+      document.getElementById('btnReindexar').addEventListener('click', reindexar);
+    }
+
+    // ------------------------------------------------------------ métricas
+
+    async function cargarStats() {
+      try {
+        const s = await Api.get('/api/dashboard/stats');
+        const t = s.tarjetas;
+        const tarjetas = [
+          ['Dentro ahora', t.personasDentro, 'text-slate-900'],
+          ['Ingresos hoy', t.ingresosHoy, 'text-slate-900'],
+          ['Autorizaciones activas', t.autorizacionesActivas, 'text-slate-900'],
+          ['Solicitudes pendientes', t.solicitudesPendientes, 'text-amber-700'],
+          ['Paquetes pendientes', t.paquetesPendientes, 'text-slate-900'],
+          ['No permitidos activos', t.noPermitidosActivos, 'text-red-700'],
+          ['Salidas no registradas', t.salidasNoRegistradas, 'text-amber-700'],
+        ];
+        document.getElementById('tarjetas').innerHTML = tarjetas.map(([etiqueta, valor, color]) => `
+          <div class="bg-white rounded-xl shadow-sm p-4">
+            <p class="text-xs text-slate-500">${esc(etiqueta)}</p>
+            <p class="text-3xl font-bold ${color} mt-1">${esc(valor)}</p>
+          </div>`).join('');
+
+        pintarGrafico(s.visitasPorHoraHoy);
+        pintarAntiguedad(s.paquetesPorAntiguedad);
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    function pintarGrafico(porHora) {
+      const etiquetas = porHora.map((_, h) => `${String(h).padStart(2, '0')}:00`);
+      if (grafico) grafico.destroy();
+      grafico = new Chart(document.getElementById('grafico'), {
+        type: 'bar',
+        data: {
+          labels: etiquetas,
+          datasets: [{ label: 'Ingresos', data: porHora, backgroundColor: '#0f172a' }],
+        },
+        options: {
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        },
+      });
+    }
+
+    function pintarAntiguedad(a) {
+      const tramos = [
+        ['Menos de 24 h', a.menosDe24Horas, 'bg-green-500'],
+        ['Entre 24 y 72 h', a.entre24Y72Horas, 'bg-amber-400'],
+        ['Entre 72 h y 7 días', a.entre72HorasY7Dias, 'bg-orange-500'],
+        ['Más de 7 días (escalados)', a.masDe7Dias, 'bg-red-600'],
+      ];
+      const total = Math.max(1, tramos.reduce((suma, [, v]) => suma + v, 0));
+      document.getElementById('antiguedad').innerHTML = tramos.map(([etiqueta, valor, color]) => `
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span class="text-slate-700">${esc(etiqueta)}</span>
+            <span class="font-medium">${esc(valor)}</span>
+          </div>
+          <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div class="h-full ${color}" style="width: ${(valor / total) * 100}%"></div>
+          </div>
+        </div>`).join('');
+    }
+
+    // ---------------------------------------------------------- documentos
+
+    async function cargarEstadoRag() {
+      try {
+        document.getElementById('estadoRag').textContent = 'Asistente: ' + await Api.get('/api/rag/estado');
+      } catch (e) {
+        document.getElementById('estadoRag').textContent = 'Asistente: estado desconocido';
+      }
+    }
+
+    async function subirDocumento(evento) {
+      evento.preventDefault();
+      const datos = new FormData();
+      datos.append('archivo', document.getElementById('dArchivo').files[0]);
+      datos.append('titulo', document.getElementById('dTitulo').value.trim());
+      datos.append('tipo', document.getElementById('dTipo').value);
+      datos.append('audiencias', document.getElementById('dAudiencia').value);
+      datos.append('version', '1');
+
+      try {
+        await Api.subir('/api/rag/documentos', datos);
+        avisar('aviso', 'Documento subido. La indexación corre en segundo plano.', 'ok');
+        evento.target.reset();
+        setTimeout(cargarDocumentos, 1500);
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    async function cargarDocumentos() {
+      const caja = document.getElementById('documentos');
+      try {
+        const lista = await Api.get('/api/rag/documentos');
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">No hay documentos. El asistente no tiene con qué responder.</p>';
+          return;
+        }
+        const colores = {
+          INDEXADO: 'bg-green-100 text-green-800',
+          INDEXANDO: 'bg-blue-100 text-blue-800',
+          SUBIDO: 'bg-slate-100 text-slate-700',
+          ERROR: 'bg-red-100 text-red-800',
+        };
+        caja.innerHTML = lista.map((d) => `
+          <div class="border border-slate-200 rounded-lg p-3 flex items-start justify-between gap-3">
+            <div>
+              <p class="font-medium text-slate-900">${esc(d.titulo)}</p>
+              <p class="text-xs text-slate-500">
+                ${esc(d.tipo)} · v${esc(d.version)} · ${esc(d.audiencias.join(', '))} · ${esc(d.chunks)} chunks
+              </p>
+              ${d.motivoError ? `<p class="text-xs text-red-700 mt-1">${esc(d.motivoError)}</p>` : ''}
+            </div>
+            <div class="text-right space-y-1">
+              <span class="text-xs px-2 py-0.5 rounded-full ${colores[d.estado] || ''}">${esc(d.estado)}</span>
+              <div><button data-borrar="${esc(d.id)}" class="text-xs text-red-600 hover:underline">Borrar</button></div>
+            </div>
+          </div>`).join('');
+
+        caja.querySelectorAll('[data-borrar]').forEach((boton) => {
+          boton.addEventListener('click', async () => {
+            try {
+              await Api.del(`/api/rag/documentos/${boton.dataset.borrar}`);
+              avisar('aviso', 'Documento borrado', 'ok');
+              cargarDocumentos();
+            } catch (e) {
+              avisar('aviso', textoDeError(e));
+            }
+          });
+        });
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    async function reindexar() {
+      try {
+        avisar('aviso', await Api.post('/api/rag/reindexar'), 'ok');
+        setTimeout(cargarDocumentos, 2000);
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    // ------------------------------------------------ preguntas sin respuesta
+
+    async function cargarSinRespuesta() {
+      const caja = document.getElementById('sinRespuesta');
+      try {
+        const lista = await Api.get('/api/rag/consultas?sinRespuesta=true');
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">Ninguna. El asistente encontró todo lo que le preguntaron.</p>';
+          return;
+        }
+        caja.innerHTML = lista.map((c) => `
+          <div class="border border-slate-200 rounded-lg p-3">
+            <p class="text-slate-900">${esc(c.pregunta)}</p>
+            <p class="text-xs text-slate-500">${esc(c.rol)} · ${esc(fecha(c.creadoEn))}
+              ${c.mejorSimilitud !== null ? `· similitud ${esc(c.mejorSimilitud.toFixed(3))}` : ''}</p>
+          </div>`).join('');
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    // -------------------------------------------------------- no permitidos
+
+    async function anadirNoPermitido(evento) {
+      evento.preventDefault();
+      try {
+        await Api.post('/api/no-permitidos', {
+          nombre: document.getElementById('nNombre').value.trim(),
+          doc4: document.getElementById('nDoc4').value || null,
+          motivo: document.getElementById('nMotivo').value.trim(),
+        });
+        avisar('aviso', 'Añadido a la lista', 'ok');
+        evento.target.reset();
+        cargarNoPermitidos();
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
+      }
+    }
+
+    async function cargarNoPermitidos() {
+      const caja = document.getElementById('noPermitidos');
+      try {
+        const lista = await Api.get('/api/no-permitidos');
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">La lista está vacía.</p>';
+          return;
+        }
+        caja.innerHTML = lista.map((n) => `
+          <div class="border rounded-lg p-3 flex items-center justify-between gap-3
+                      ${n.activo ? 'border-red-200 bg-red-50' : 'border-slate-200 opacity-60'}">
+            <div>
+              <p class="font-medium">${esc(n.nombre)} ${n.doc4 ? `· ${esc(n.doc4)}` : '<span class="text-xs text-amber-700">(sin documento)</span>'}</p>
+              <p class="text-xs text-slate-600">${esc(n.motivo)}</p>
+            </div>
+            ${n.activo ? `<button data-quitar="${esc(n.id)}" class="text-xs text-slate-600 hover:underline">Retirar</button>` : ''}
+          </div>`).join('');
+
+        caja.querySelectorAll('[data-quitar]').forEach((boton) => {
+          boton.addEventListener('click', async () => {
+            try {
+              await Api.del(`/api/no-permitidos/${boton.dataset.quitar}`);
+              cargarNoPermitidos();
+            } catch (e) {
+              avisar('aviso', textoDeError(e));
+            }
+          });
+        });
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    // ------------------------------------------------------------ bitácora
+
+    async function cargarBitacora() {
+      const caja = document.getElementById('bitacora');
+      const parametros = new URLSearchParams();
+      const actor = document.getElementById('bActor').value.trim();
+      const entidad = document.getElementById('bEntidad').value.trim();
+      const desde = document.getElementById('bDesde').value;
+      if (actor) parametros.set('actor', actor);
+      if (entidad) parametros.set('entidad', entidad.toUpperCase());
+      if (desde) parametros.set('desde', new Date(desde).toISOString());
+
+      try {
+        const lista = await Api.get('/api/bitacora?' + parametros.toString());
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">Sin entradas para ese filtro.</p>';
+          return;
+        }
+        caja.innerHTML = lista.map((b) => `
+          <div class="border-b border-slate-100 py-2">
+            <p class="text-slate-900">
+              <span class="font-mono text-xs text-slate-500">${esc(fecha(b.fecha))}</span>
+              <span class="font-medium">${esc(b.accion)}</span>
+            </p>
+            <p class="text-xs text-slate-500">${esc(b.actor)} (${esc(b.rol)}) · ${esc(b.entidad)}${b.entidadId ? ' #' + esc(b.entidadId) : ''}</p>
+            ${b.detalle ? `<p class="text-xs text-slate-600">${esc(b.detalle)}</p>` : ''}
+          </div>`).join('');
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
