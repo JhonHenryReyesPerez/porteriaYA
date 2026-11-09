@@ -13,7 +13,15 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * transacciones confirmaron, y el test de concurrencia del uso atomico daria
  * un falso verde si la transaccion del test envolviera a los hilos (§15).
  */
-@SpringBootTest(properties = "porteria.admin.pin=" + IntegracionBase.PIN_ADMIN)
+@SpringBootTest(properties = {
+        "porteria.admin.pin=" + IntegracionBase.PIN_ADMIN,
+        // Puerto muerto a proposito: las pruebas no deben depender de si hay un
+        // n8n levantado en la maquina, y asi todas corren bajo el escenario
+        // "n8n caido" que §10 exige tolerar.
+        "porteria.n8n.webhook-url=http://127.0.0.1:1/webhook/pruebas",
+        "porteria.n8n.timeout-conexion-segundos=1",
+        "porteria.n8n.timeout-lectura-segundos=1"
+})
 public abstract class IntegracionBase {
 
     /** El .env no existe en las pruebas, asi que el PIN se fija aqui para todas. */

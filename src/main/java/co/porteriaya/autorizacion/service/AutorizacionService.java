@@ -19,6 +19,9 @@ import co.porteriaya.common.RecursoNoEncontradoException;
 import co.porteriaya.common.Rol;
 import co.porteriaya.common.SolicitudInvalidaException;
 import co.porteriaya.config.PorteriaProperties;
+import co.porteriaya.evento.EventoPorteria;
+import co.porteriaya.evento.EventoPublisher;
+import co.porteriaya.evento.TipoEvento;
 import co.porteriaya.residente.entity.Residente;
 import co.porteriaya.residente.repository.ResidenteRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +42,7 @@ public class AutorizacionService {
     private final ResidenteRepository residentes;
     private final GeneradorCodigo generadorCodigo;
     private final BitacoraService bitacora;
+    private final EventoPublisher eventos;
     private final PorteriaProperties propiedades;
     private final Clock clock;
 
@@ -75,8 +79,18 @@ public class AutorizacionService {
         bitacora.registrar(actor, Rol.RESIDENTE, ENTIDAD, guardada.getId(), "AUTORIZACION_CREADA",
                 "Tipo %s para %s".formatted(guardada.getTipo(), guardada.getVisitanteNombre()));
 
-        // El evento AUTORIZACION_CREADA de §10 se emite aqui cuando exista el
-        // publicador de eventos (paso 3 del orden de construccion).
+        // El codigo SI va en el payload: el flujo 1 de n8n tiene que enviarselo
+        // al residente por correo (§14). En logs nunca aparece.
+        eventos.publicar(TipoEvento.AUTORIZACION_CREADA, EventoPorteria.datos(
+                "autorizacionId", guardada.getId(),
+                "apartamento", residente.identificador(),
+                "correoResidente", residente.getCorreo(),
+                "tipo", guardada.getTipo().name(),
+                "codigo", guardada.getCodigo(),
+                "visitanteNombre", guardada.getVisitanteNombre(),
+                "validaDesde", guardada.getValidaDesde().toString(),
+                "validaHasta", guardada.getValidaHasta().toString()));
+
         return RespuestaAutorizacion.de(guardada);
     }
 

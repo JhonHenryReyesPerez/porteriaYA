@@ -59,7 +59,12 @@ public record PorteriaProperties(
     public record Paquete(int primerRecordatorioHoras, int segundoRecordatorioHoras, int escalamientoDias) {
     }
 
-    /** Destino de los eventos y secreto compartido (§10). */
-    public record N8n(String webhookUrl, String secret) {
+    /**
+     * Destino de los eventos y secreto compartido (§10). Los timeouts importan:
+     * un n8n que acepta la conexion y se queda colgado es peor que uno caido,
+     * porque ocuparia los hilos del ejecutor de eventos.
+     */
+    public record N8n(String webhookUrl, String secret,
+                      int timeoutConexionSegundos, int timeoutLecturaSegundos) {
     }
 }

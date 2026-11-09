@@ -12,6 +12,9 @@ import co.porteriaya.autorizacion.entity.EstadoAutorizacion;
 import co.porteriaya.autorizacion.repository.AutorizacionRepository;
 import co.porteriaya.bitacora.service.BitacoraService;
 import co.porteriaya.common.Rol;
+import co.porteriaya.evento.EventoPorteria;
+import co.porteriaya.evento.EventoPublisher;
+import co.porteriaya.evento.TipoEvento;
 import co.porteriaya.nopermitido.service.Coincidencia;
 import co.porteriaya.nopermitido.service.NoPermitidoService;
 import co.porteriaya.porteria.dto.Advertencia;
@@ -41,6 +44,7 @@ public class ValidacionService {
     private final AutorizacionRepository autorizaciones;
     private final NoPermitidoService noPermitidos;
     private final BitacoraService bitacora;
+    private final EventoPublisher eventos;
     private final Clock clock;
 
     @Transactional
@@ -80,8 +84,14 @@ public class ValidacionService {
                     "INGRESO_NEGADO_NO_PERMITIDO",
                     "Coincidencia exacta con la lista de no permitidos. Motivo del registro: "
                             + coincidencia.motivo());
-            // El evento PERSONA_NO_PERMITIDA de §10 se emite aqui cuando exista
-            // el publicador de eventos (paso 3 del orden de construccion).
+            // Alerta de seguridad: va a administracion por Telegram (flujo 4).
+            // Sin documento, solo nombre y apartamento (§10, §6 privacidad).
+            eventos.publicar(TipoEvento.PERSONA_NO_PERMITIDA, EventoPorteria.datos(
+                    "apartamento", autorizacion.getResidente().identificador(),
+                    "visitanteNombre", solicitud.visitanteNombre(),
+                    "motivoRegistro", coincidencia.motivo(),
+                    "vigilante", actor));
+
             return RespuestaValidacion.rechazo(MotivoRechazo.PERSONA_NO_PERMITIDA, coincidencia.motivo());
         }
         if (coincidencia.avisa()) {

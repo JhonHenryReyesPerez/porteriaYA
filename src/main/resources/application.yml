@@ -70,6 +70,8 @@ porteria:
   n8n:
     webhook-url: ${N8N_WEBHOOK_URL:http://localhost:5678/webhook/porteriaya}
     secret: ${PORTERIA_SECRET:}
+    timeout-conexion-segundos: 3
+    timeout-lectura-segundos: 5
 
 # Parametros del RAG (§11)
 rag:

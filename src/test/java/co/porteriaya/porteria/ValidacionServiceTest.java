@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -27,7 +28,9 @@ import co.porteriaya.autorizacion.entity.TipoAutorizacion;
 import co.porteriaya.autorizacion.repository.AutorizacionRepository;
 import co.porteriaya.bitacora.service.BitacoraService;
 import co.porteriaya.common.Rol;
+import co.porteriaya.evento.TipoEvento;
 import co.porteriaya.config.ClockConfig;
+import co.porteriaya.evento.EventoPublisher;
 import co.porteriaya.nopermitido.entity.NoPermitido;
 import co.porteriaya.nopermitido.service.Coincidencia;
 import co.porteriaya.nopermitido.service.NoPermitidoService;
@@ -73,13 +76,15 @@ class ValidacionServiceTest {
     private NoPermitidoService noPermitidos;
     @Mock
     private BitacoraService bitacora;
+    @Mock
+    private EventoPublisher eventos;
 
     private ValidacionService servicio;
 
     @BeforeEach
     void prepararServicio() {
         Clock reloj = Clock.fixed(AHORA, ClockConfig.ZONA);
-        servicio = new ValidacionService(autorizaciones, noPermitidos, bitacora, reloj);
+        servicio = new ValidacionService(autorizaciones, noPermitidos, bitacora, eventos, reloj);
     }
 
     // ------------------------------------------------------------ utilidades
@@ -242,6 +247,8 @@ class ValidacionServiceTest {
         assertThat(respuesta.detalle()).isEqualTo("Agresion al personal");
         // Es una alerta de seguridad: queda en bitacora aunque el vigilante no siga
         verify(bitacora).registrar(any(), any(Rol.class), anyString(), any(), anyString(), anyString());
+        // Y la alerta sale hacia administracion (§10, flujo 4)
+        verify(eventos).publicar(eq(TipoEvento.PERSONA_NO_PERMITIDA), any());
     }
 
     @Test
@@ -259,7 +266,8 @@ class ValidacionServiceTest {
         assertThat(respuesta.motivo()).isNull();
         assertThat(respuesta.advertencias()).containsExactly(Advertencia.POSIBLE_NO_PERMITIDO);
         assertThat(respuesta.detalle()).isEqualTo("Hurto en zonas comunes");
-        verifyNoInteractions(bitacora);
+        // Un aviso no es una alerta: ni bitacora ni evento a administracion
+        verifyNoInteractions(bitacora, eventos);
     }
 
     // ------------------------------------------------------- el orden importa
