@@ -31,6 +31,7 @@ import co.porteriaya.common.Rol;
 import co.porteriaya.evento.TipoEvento;
 import co.porteriaya.config.ClockConfig;
 import co.porteriaya.evento.EventoPublisher;
+import co.porteriaya.porteria.repository.IngresoRepository;
 import co.porteriaya.nopermitido.entity.NoPermitido;
 import co.porteriaya.nopermitido.service.Coincidencia;
 import co.porteriaya.nopermitido.service.NoPermitidoService;
@@ -73,6 +74,8 @@ class ValidacionServiceTest {
     @Mock
     private AutorizacionRepository autorizaciones;
     @Mock
+    private IngresoRepository ingresos;
+    @Mock
     private NoPermitidoService noPermitidos;
     @Mock
     private BitacoraService bitacora;
@@ -84,7 +87,7 @@ class ValidacionServiceTest {
     @BeforeEach
     void prepararServicio() {
         Clock reloj = Clock.fixed(AHORA, ClockConfig.ZONA);
-        servicio = new ValidacionService(autorizaciones, noPermitidos, bitacora, eventos, reloj);
+        servicio = new ValidacionService(autorizaciones, ingresos, noPermitidos, bitacora, eventos, reloj);
     }
 
     // ------------------------------------------------------------ utilidades

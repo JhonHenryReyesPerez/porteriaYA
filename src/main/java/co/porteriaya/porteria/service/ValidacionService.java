@@ -21,6 +21,8 @@ import co.porteriaya.porteria.dto.Advertencia;
 import co.porteriaya.porteria.dto.MotivoRechazo;
 import co.porteriaya.porteria.dto.RespuestaValidacion;
 import co.porteriaya.porteria.dto.SolicitudValidacion;
+import co.porteriaya.porteria.entity.EstadoIngreso;
+import co.porteriaya.porteria.repository.IngresoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +44,7 @@ public class ValidacionService {
     private static final String ENTIDAD = "AUTORIZACION";
 
     private final AutorizacionRepository autorizaciones;
+    private final IngresoRepository ingresos;
     private final NoPermitidoService noPermitidos;
     private final BitacoraService bitacora;
     private final EventoPublisher eventos;
@@ -99,8 +102,13 @@ public class ValidacionService {
         }
 
         // --- Paso 5: ya figura como Dentro con la misma autorizacion ---
-        // Necesita el repositorio de ingresos, que llega en el paso 3. Cuando
-        // exista, aqui se anade Advertencia.YA_DENTRO.
+        // Es un aviso, no un rechazo: §6 dice que se avisa al vigilante ANTES
+        // de duplicar, y la decision es suya. El id puede ser nulo en pruebas
+        // unitarias con entidades sin persistir.
+        if (autorizacion.getId() != null
+                && ingresos.existsByAutorizacionIdAndEstado(autorizacion.getId(), EstadoIngreso.DENTRO)) {
+            advertencias.add(Advertencia.YA_DENTRO);
+        }
 
         return RespuestaValidacion.permitido(resumir(autorizacion), advertencias,
                 coincidencia.avisa() ? coincidencia.motivo() : null);

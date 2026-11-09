@@ -137,7 +137,8 @@ Esto introduce **advertencias** en la respuesta de `validar`, distintas de un re
 
 - `POST /api/porteria/validar` responde `permitido` (booleano), `motivo` (enum del rechazo, nulo si está permitido) y `advertencias` (lista de enums). Una coincidencia parcial es `permitido: true` con `advertencias: [POSIBLE_NO_PERMITIDO]`.
 - El paso 5 usa el mismo mecanismo: ya figurar como Dentro con la misma autorización es la advertencia `YA_DENTRO`, no un rechazo.
-- `POST /api/porteria/ingresos` **exige confirmación explícita** cuando hay advertencias (`confirmaAdvertencias: true` en el cuerpo). Sin ella responde **409** con las advertencias, para que nadie se salte el aviso llamando directo al endpoint de ingreso.
+- `POST /api/porteria/ingresos` **exige confirmación explícita** cuando hay advertencias (`confirmaAdvertencias: true` en el cuerpo). Sin ella responde **409 `ADVERTENCIAS_SIN_CONFIRMAR`**, para que nadie se salte el aviso llamando directo al endpoint de ingreso.
+- **El rechazo de `/ingresos` confirma la transacción y solo después responde 409.** El service devuelve un resultado; es el controller quien traduce. No se señala lanzando desde dentro de la transacción, porque el rollback se llevaría por delante la entrada en `Bitacora` del intento y la alerta `PERSONA_NO_PERMITIDA`, que sale en `AFTER_COMMIT` y por tanto no saldría nunca. Un intento denegado tiene que dejar rastro precisamente porque fue denegado.
 
 ### Otras reglas
 - Visita no anunciada: el vigilante la registra como **`SolicitudNoAnunciada`** (entidad propia, no un Ingreso) y se pide aprobación al residente. Tiempo límite de respuesta: 3 minutos (configurable). El enlace de aprobación usa **token aleatorio de un solo uso con vencimiento**.
