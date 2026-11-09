@@ -59,8 +59,9 @@ porteria:
       SERVICIO_RECURRENTE: 300
       MUDANZA: 480
   aprobacion:
+    # Plazo para que el residente responda. El token de aprobacion vence con
+    # la solicitud, no por separado.
     timeout-minutos: 3
-    token-vigencia-minutos: 10
   permanencia:
     gracia-minutos: 30
   paquete:

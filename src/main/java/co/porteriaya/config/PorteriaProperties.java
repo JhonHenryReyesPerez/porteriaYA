@@ -47,8 +47,15 @@ public record PorteriaProperties(
         }
     }
 
-    /** Ventana de respuesta del residente a una visita no anunciada (§6). */
-    public record Aprobacion(int timeoutMinutos, int tokenVigenciaMinutos) {
+    /**
+     * Ventana de respuesta del residente a una visita no anunciada (§6).
+     *
+     * Es un solo plazo a proposito: el token de aprobacion vence con su
+     * solicitud. Dos deadlines distintos solo darian pie a la pregunta de cual
+     * manda, y la respuesta siempre seria el estado de la solicitud, porque
+     * desde SIN_RESPUESTA ya no existe la transicion a APROBADA.
+     */
+    public record Aprobacion(int timeoutMinutos) {
     }
 
     /** Gracia sobre la duracion esperada antes de PERMANENCIA_EXCEDIDA (§6). */

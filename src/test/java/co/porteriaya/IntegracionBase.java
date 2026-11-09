@@ -2,6 +2,7 @@ package co.porteriaya;
 
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 /**
@@ -22,6 +23,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
         "porteria.n8n.timeout-conexion-segundos=1",
         "porteria.n8n.timeout-lectura-segundos=1"
 })
+// En la base y no en cada clase: asi todos los *IT comparten un solo contexto
+// de Spring y cualquiera puede inyectar el colector cuando lo necesite.
+@Import(ColectorDeEventos.class)
 public abstract class IntegracionBase {
 
     /** El .env no existe en las pruebas, asi que el PIN se fija aqui para todas. */
