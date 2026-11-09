@@ -21,7 +21,7 @@ Principio rector: **Spring Boot es el único dueño de reglas, tiempos y consult
 | Extracción de PDF | Apache PDFBox — única dependencia nueva aprobada para la ingesta; Markdown se lee directo |
 | Mapeo DTO | A mano o MapStruct; si se usa MapStruct, se declara en el `pom.xml` desde el primer corte |
 | Automatización | n8n, Mailpit (SMTP de pruebas), Telegram |
-| Infra | Docker Compose: `app`, `postgres`, `qdrant`, `ollama`, `n8n`, `mailpit` |
+| Infra | Docker Compose: `postgres`, `qdrant`, `n8n`, `mailpit` por defecto; `ollama` (perfil `rag`) y `app` (perfil `app`) solo cuando se piden |
 | Pruebas | JUnit 5, Mockito, Testcontainers (PostgreSQL y Qdrant), AssertJ |
 
 Zona horaria de todo el sistema: `America/Bogota`.
@@ -29,8 +29,10 @@ Zona horaria de todo el sistema: `America/Bogota`.
 ## 3. Comandos
 
 ```bash
-docker compose up -d                 # levanta postgres, qdrant, ollama, n8n, mailpit
+docker compose up -d                 # levanta postgres, qdrant, n8n, mailpit
+docker compose up -d ollama          # solo al usar el RAG (perfil rag): carga modelos en RAM
 docker compose exec ollama ollama pull nomic-embed-text   # una sola vez
+docker compose stop ollama           # al terminar con el RAG, para liberar RAM
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo    # reloj simulado + datos de demo
 ./mvnw test                          # unitarias

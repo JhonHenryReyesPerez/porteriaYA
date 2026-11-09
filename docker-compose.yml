@@ -1,5 +1,6 @@
 # PorteriaYa v2 — infraestructura local.
-#   docker compose up -d                  levanta postgres, qdrant, ollama, n8n, mailpit
+#   docker compose up -d                  levanta postgres, qdrant, n8n, mailpit
+#   docker compose up -d ollama           anade Ollama (perfil rag), solo cuando se use
 #   docker compose --profile app up -d    ademas construye y levanta la app
 # Los valores salen de .env (ver .env.example). Nunca credenciales literales aqui.
 name: porteriaya
@@ -34,7 +35,12 @@ services:
     volumes:
       - qdrant-data:/qdrant/storage
 
+  # Perfil aparte: Ollama carga modelos en RAM y solo hace falta desde el paso 7.
+  # `docker compose up -d` NO la arranca. Para levantarla cuando toque:
+  #   docker compose up -d ollama        (nombrarla activa su perfil)
+  #   docker compose stop ollama         (para liberar la RAM al terminar)
   ollama:
+    profiles: ["rag"]
     image: ollama/ollama:0.40.15
     container_name: porteriaya-ollama
     restart: unless-stopped

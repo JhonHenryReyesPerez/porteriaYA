@@ -21,8 +21,12 @@ El contrato completo (reglas de negocio, estados, rutas y convenciones) vive en 
 ```bash
 cp .env.example .env                 # y pon valores reales: ADMIN_PIN, PORTERIA_SECRET, contrasena de la BD
 
-docker compose up -d                 # postgres, qdrant, ollama, n8n, mailpit
-docker compose exec ollama ollama pull nomic-embed-text   # una sola vez, ~270 MB
+docker compose up -d                 # postgres, qdrant, n8n, mailpit
+
+# Ollama va en el perfil `rag` porque carga modelos en RAM: solo se levanta al usar el RAG
+docker compose up -d ollama                               # nombrarla activa su perfil
+docker compose exec ollama ollama pull nomic-embed-text   # una sola vez, ~274 MB
+docker compose stop ollama                                # al terminar, libera la RAM
 
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=demo    # reloj simulado + datos de demo
