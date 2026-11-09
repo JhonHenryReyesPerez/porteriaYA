@@ -102,6 +102,9 @@ rag:
       - application/pdf
       - text/markdown
       - text/plain
+  consultas:
+    # Limite de frecuencia por actor para controlar costo y abuso (§16)
+    max-por-minuto-por-actor: 10
 
 logging:
   level:

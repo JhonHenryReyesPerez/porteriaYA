@@ -16,7 +16,8 @@ public record RagProperties(
         Embedding embedding,
         Vector vector,
         Llm llm,
-        Subida subida
+        Subida subida,
+        Consultas consultas
 ) {
 
     /**
@@ -37,5 +38,9 @@ public record RagProperties(
     }
 
     public record Subida(int maxMb, List<String> tiposPermitidos) {
+    }
+
+    /** Limite de frecuencia de /api/rag/preguntar por actor (§16, -> 429). */
+    public record Consultas(int maxPorMinutoPorActor) {
     }
 }
