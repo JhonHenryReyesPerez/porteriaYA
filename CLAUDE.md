@@ -104,10 +104,10 @@ Visita (1 o varios usos), Domiciliario o proveedor (pocas horas, 1 uso), Servici
 1. El código existe y la autorización no está cancelada.
 2. Fecha y hora actuales dentro de la ventana; si es recurrente, coinciden día de la semana y franja horaria.
 3. Quedan usos (ver «Consumo del uso» más abajo).
-4. La persona no está en la lista de no permitidas; si coincide, se niega, se registra y se emite `PERSONA_NO_PERMITIDA`.
+4. La persona no está en la lista de no permitidas. El criterio tiene **dos niveles**: coincidencia exacta niega; coincidencia solo por nombre avisa (ver «Coincidencia con la lista de no permitidos»).
 5. La persona no figura ya como Dentro con la misma autorización; se avisa al vigilante antes de duplicar.
 
-La respuesta de `/api/porteria/validar` es `permitido` o el **motivo del rechazo** (enum). No cambiar el orden: el motivo devuelto depende de él.
+La respuesta de `/api/porteria/validar` es `permitido` o el **motivo del rechazo** (enum), más las **advertencias** que no impiden el ingreso pero el vigilante debe ver (§«Coincidencia con la lista de no permitidos»). No cambiar el orden: el motivo devuelto depende de él.
 
 ### Consumo del uso (decidido 2026-11-08)
 La cadena de 5 pasos se evalúa **dos veces** y solo la segunda escribe:
@@ -122,6 +122,20 @@ La cadena de 5 pasos se evalúa **dos veces** y solo la segunda escribe:
 - Los pasos 4 y 5 se comprueban **antes** del UPDATE, dentro de la misma transacción. Así no hay que revertir un uso ya descontado, y el orden de los motivos de rechazo se conserva igual.
 - `usos_max IS NULL` significa **usos ilimitados** (servicio recurrente, mudanza o trabajo). El `IS NULL` del WHERE es obligatorio: sin él, la comparación con NULL nunca es verdadera y todo ingreso recurrente daría 409.
 - El test de concurrencia de §15 apunta a `POST /api/porteria/ingresos`, no a `validar`.
+
+#### Coincidencia con la lista de no permitidos (decidido 2026-11-08)
+Como del visitante solo se guardan nombre y los últimos 4 dígitos, el criterio tiene dos niveles:
+
+- **Nombre normalizado y `doc4` iguales** → se niega el ingreso, se registra en `Bitacora` y se emite `PERSONA_NO_PERMITIDA`. Motivo de rechazo: `PERSONA_NO_PERMITIDA`.
+- **Solo el nombre normalizado igual** (incluido el caso en que el registro de la lista no tiene `doc4`) → **no se niega automáticamente**. Se devuelve la advertencia `POSIBLE_NO_PERMITIDO` con el motivo del registro para que el vigilante confirme o descarte. Si confirma, el ingreso se deniega y se emite `PERSONA_NO_PERMITIDA`.
+- Normalizar es: minúsculas, sin acentos (descomponer a NFD y borrar diacríticos) y espacios colapsados. «José  Pérez» y «jose perez» coinciden.
+- Solo cuentan los registros con `activo = true`.
+
+Esto introduce **advertencias** en la respuesta de `validar`, distintas de un rechazo:
+
+- `POST /api/porteria/validar` responde `permitido` (booleano), `motivo` (enum del rechazo, nulo si está permitido) y `advertencias` (lista de enums). Una coincidencia parcial es `permitido: true` con `advertencias: [POSIBLE_NO_PERMITIDO]`.
+- El paso 5 usa el mismo mecanismo: ya figurar como Dentro con la misma autorización es la advertencia `YA_DENTRO`, no un rechazo.
+- `POST /api/porteria/ingresos` **exige confirmación explícita** cuando hay advertencias (`confirmaAdvertencias: true` en el cuerpo). Sin ella responde **409** con las advertencias, para que nadie se salte el aviso llamando directo al endpoint de ingreso.
 
 ### Otras reglas
 - Visita no anunciada: el vigilante la registra como **`SolicitudNoAnunciada`** (entidad propia, no un Ingreso) y se pide aprobación al residente. Tiempo límite de respuesta: 3 minutos (configurable). El enlace de aprobación usa **token aleatorio de un solo uso con vencimiento**.
@@ -271,6 +285,8 @@ Escribir primero o junto con el código:
 - Usos ilimitados (`usos_max IS NULL`): varios ingresos seguidos dentro de la franja, todos permitidos.
 - Recurrencia por día de la semana y franja horaria (bordes: justo en `horaDesde`, justo en `horaHasta`, cambio de día).
 - Todas las transiciones de estado válidas e inválidas (409), incluidas `Error → Indexando` e `Indexado → Indexando` de `Documento`.
+- Lista de no permitidos: coincidencia exacta niega; coincidencia solo por nombre devuelve `POSIBLE_NO_PERMITIDO` sin negar; normalización de acentos, mayúsculas y espacios; registros inactivos no cuentan.
+- `POST /api/porteria/ingresos` con advertencias y sin `confirmaAdvertencias` → 409.
 - Escalamiento de paquetes (24 h, 72 h, 7 días) con `Clock` fijo y sin repetir avisos.
 - Permanencia excedida una sola vez; cierre automático a medianoche.
 - Token de aprobación: un solo uso, vencimiento, y que `GET /api/aprobacion/{token}` **no** lo consuma.
@@ -338,7 +354,6 @@ Residente autoriza a un amigo y recibe el código → vigilante valida y el resi
 
 Pregunta antes de implementar cualquiera de estas; no las resuelvas por tu cuenta.
 
-1. **Criterio de coincidencia con la lista de no permitidos** (paso 4 de la validación). Con solo nombre y últimos 4 dígitos guardados, falta definir si coincide por ambos campos, por nombre normalizado, o si una coincidencia parcial solo avisa al vigilante en vez de negar. Afecta a una regla no recortable y los falsos positivos y negativos tienen consecuencias muy distintas.
-2. **`duracion_esperada_min`:** ¿valor por defecto según el tipo de autorización, o lo escribe el residente siempre? Un domiciliario y una mudanza no pueden compartir default.
-3. **Anulación por administración:** qué ruta la expone y qué efecto tiene sobre una solicitud ya Rechazada o Denegada (¿crea el ingreso, reabre la solicitud?).
-4. **Una sola instancia de la app.** El `@Scheduled` no lleva bloqueo distribuido; con dos instancias las tareas se duplicarían. Asumido como una sola instancia; confirmar que basta para la entrega.
+1. **`duracion_esperada_min`:** ¿valor por defecto según el tipo de autorización, o lo escribe el residente siempre? Un domiciliario y una mudanza no pueden compartir default.
+2. **Anulación por administración:** qué ruta la expone y qué efecto tiene sobre una solicitud ya Rechazada o Denegada (¿crea el ingreso, reabre la solicitud?).
+3. **Una sola instancia de la app.** El `@Scheduled` no lleva bloqueo distribuido; con dos instancias las tareas se duplicarían. Asumido como una sola instancia; confirmar que basta para la entrega.
