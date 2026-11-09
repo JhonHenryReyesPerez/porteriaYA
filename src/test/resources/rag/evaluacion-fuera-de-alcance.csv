@@ -1,0 +1,18 @@
+# Preguntas que NO estan en los documentos del conjunto (CLAUDE.md §11, §19).
+#
+# Formato: una pregunta por linea.
+#
+# El recall solo mide una mitad del umbral. Si rag.umbral fuera 0.0, el recall
+# seria perfecto y el asistente contestaria cualquier cosa inventando contexto.
+# Estas preguntas miden la otra mitad: tienen que quedar POR DEBAJO del umbral,
+# para que la respuesta sea «no encuentro esto» y no se llame al LLM.
+#
+# Son preguntas plausibles en un conjunto residencial, pero que estos dos
+# documentos no responden. Una pregunta absurda no mide nada: cualquier umbral
+# la rechazaria.
+
+¿Cuánto cuesta la administración este mes?
+¿Cuándo es la próxima asamblea de copropietarios?
+¿Qué empresa recoge las basuras del conjunto?
+¿Cuál es la clave del wifi de la portería?
+¿Cómo pido el certificado de paz y salvo?

@@ -1,0 +1,38 @@
+# Conjunto de evaluacion del asistente (CLAUDE.md §11).
+#
+# Formato: pregunta ; titulo del documento que DEBE aparecer entre los top-5
+#
+# Mide recall@5: cuantas veces el documento correcto aparece entre los cinco
+# chunks recuperados. Es el numero con el que se ajustan el tamano de chunk y
+# el umbral, en vez de hacerlo a ojo.
+#
+# Al anadir preguntas, que sean como las que haria una persona de verdad: con
+# tildes o sin ellas, coloquiales, no copiadas del texto del documento. Una
+# pregunta que repite las palabras exactas del reglamento siempre acierta y no
+# mide nada.
+#
+# Las lineas que empiezan por # y las vacias se ignoran.
+
+# ---------------------------------------- Reglamento de Convivencia (10)
+¿Cuál es el horario de mudanzas?;Reglamento de Convivencia
+¿Puedo trastear un domingo?;Reglamento de Convivencia
+¿Con cuánta anticipación tengo que avisar una mudanza?;Reglamento de Convivencia
+que ascensor hay que usar para subir muebles;Reglamento de Convivencia
+¿A qué hora abre la piscina?;Reglamento de Convivencia
+hasta que hora se puede jugar en la cancha;Reglamento de Convivencia
+¿Desde qué hora no se puede hacer ruido?;Reglamento de Convivencia
+¿Puedo meter a mi perro a la piscina?;Reglamento de Convivencia
+cuanto tiempo puede dejar el carro un visitante;Reglamento de Convivencia
+¿Se puede remodelar el apartamento un sábado?;Reglamento de Convivencia
+
+# ---------------------------------------- Protocolo de Porteria (10)
+¿Validar un código gasta el uso?;Protocolo de Porteria
+que hago si el sistema me dice que la persona esta en la lista negra;Protocolo de Porteria
+¿Cuánto tiempo tiene el residente para contestar una visita no anunciada?;Protocolo de Porteria
+si el residente rechaza la visita puedo dejar entrar igual;Protocolo de Porteria
+¿Recibo un paquete de un apartamento desocupado?;Protocolo de Porteria
+que necesito para entregarle un paquete a alguien;Protocolo de Porteria
+¿A qué número llamo si hay una emergencia médica?;Protocolo de Porteria
+que se hace si huele a gas;Protocolo de Porteria
+¿Qué pasa a medianoche con la gente que sigue dentro?;Protocolo de Porteria
+que tengo que dejar anotado al entregar el turno;Protocolo de Porteria
