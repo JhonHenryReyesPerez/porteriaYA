@@ -1,0 +1,64 @@
+{
+  "name": "PorteriaYa 03 - Paquetes",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya-paquetes",
+        "responseMode": "onReceived",
+        "responseData": "{\"recibido\":true}",
+        "options": {}
+      },
+      "id": "a3000000-0000-4000-8000-000000000001",
+      "name": "Evento de paquete",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "webhookId": "porteriaya-paquetes"
+    },
+    {
+      "parameters": {
+        "jsCode": "// §14.3 Paquetes: recepcion, los dos recordatorios y el escalamiento.\n//\n// Los plazos (24 h, 72 h, 7 dias) NO estan aqui. Los decide el @Scheduled de\n// Spring con el Clock inyectado, y cada aviso tiene su bandera en base para no\n// repetirse (§6, §9). n8n se limita a redactar lo que ya ocurrio: si hace falta\n// cambiar un plazo, se cambia en porteria.paquetes.* y no en este nodo.\n\nconst esperado = $env.PORTERIA_SECRET;\nconst admin = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const evento = item.json.body || item.json;\n\n  if (esperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== esperado) {\n      throw new Error('X-Porteria-Secret invalido: evento descartado');\n    }\n  }\n\n  const d = evento.datos || {};\n  const apto = d.apartamento || 'sin apartamento';\n  let destinatario = d.correoResidente || admin;\n  let asunto;\n  let texto;\n\n  switch (evento.tipo) {\n    case 'PAQUETE_RECIBIDO':\n      asunto = 'Tienes un paquete en porteria';\n      texto = [\n        'Llego un paquete para el apartamento ' + apto + ': ' + d.descripcion + '.',\n        d.remitente ? 'Remitente: ' + d.remitente : '',\n        '',\n        'CODIGO DE RETIRO: ' + d.codigoRetiro,\n        '',\n        'Presenta este codigo en porteria, o pide que lo retire alguien que',\n        'tengas registrado como autorizado a retirar.',\n      ].filter(Boolean).join('\\n');\n      break;\n\n    case 'PAQUETE_RECORDATORIO':\n      asunto = 'Recordatorio: paquete sin retirar (' + d.hitoHoras + ' h)';\n      texto = [\n        'El paquete \"' + d.descripcion + '\" sigue en porteria.',\n        'Lleva ' + d.horasSinRetirar + ' horas sin retirar.',\n        'Recibido el ' + d.recibidoEn + '.',\n        '',\n        'A los 7 dias se escala a la administracion.',\n      ].join('\\n');\n      break;\n\n    case 'PAQUETE_ESCALADO':\n      // Este no va al residente: va a administracion, que es a quien se escala.\n      destinatario = admin;\n      asunto = 'Paquete escalado: apartamento ' + apto;\n      texto = [\n        'El paquete \"' + d.descripcion + '\" del apartamento ' + apto + ' lleva',\n        d.diasSinRetirar + ' dias sin retirar y se escala a administracion.',\n        '',\n        'Recibido el ' + d.recibidoEn + '.',\n      ].join('\\n');\n      break;\n\n    default:\n      console.log('Tipo que no corresponde a este flujo: ' + evento.tipo);\n      continue;\n  }\n\n  salida.push({ json: { tipo: evento.tipo, destinatario, asunto, texto } });\n}\n\nreturn salida;\n"
+      },
+      "id": "a3000000-0000-4000-8000-000000000002",
+      "name": "Redactar aviso de paquete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "porteria@altosdelparque.test",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {}
+      },
+      "id": "a3000000-0000-4000-8000-000000000003",
+      "name": "Enviar aviso",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [240, 0],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "Mailpit"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Evento de paquete": {
+      "main": [[{ "node": "Redactar aviso de paquete", "type": "main", "index": 0 }]]
+    },
+    "Redactar aviso de paquete": {
+      "main": [[{ "node": "Enviar aviso", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,67 @@
+{
+  "name": "PorteriaYa 00 - Enrutador de eventos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya",
+        "responseMode": "onReceived",
+        "responseData": "{\"recibido\":true}",
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000001",
+      "name": "Webhook PorteriaYa",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "webhookId": "porteriaya"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enrutador de eventos de PorteriaYa.\n//\n// La app publica TODOS los eventos a un unico webhook (porteria.n8n.webhook-url),\n// asi que algo tiene que repartirlos. Este flujo es ese reparto y nada mas:\n// valida el secreto compartido (§10) y reenvia el evento intacto al flujo que le\n// toca. No redacta mensajes ni decide reglas de negocio.\n//\n// Se reenvia por HTTP a webhooks con nombre, y no con nodos Execute Workflow,\n// para que no haya que cablear IDs de workflow a mano despues de importar.\n\nconst esperado = $env.PORTERIA_SECRET;\n\nconst DESTINO = {\n  // §14.1 Visitas\n  AUTORIZACION_CREADA: 'porteriaya-visitas',\n  INGRESO_REGISTRADO: 'porteriaya-visitas',\n\n  // §14.2 Aprobacion en vivo\n  VISITA_NO_ANUNCIADA: 'porteriaya-aprobacion',\n\n  // §14.3 Paquetes\n  PAQUETE_RECIBIDO: 'porteriaya-paquetes',\n  PAQUETE_RECORDATORIO: 'porteriaya-paquetes',\n  PAQUETE_ESCALADO: 'porteriaya-paquetes',\n\n  // §14.4 Alertas de seguridad\n  PERSONA_NO_PERMITIDA: 'porteriaya-alertas',\n  PERMANENCIA_EXCEDIDA: 'porteriaya-alertas',\n  SALIDA_NO_REGISTRADA: 'porteriaya-alertas',\n\n  // §10 emite estos dos, pero §14 no les asigna flujo. Van al mismo sitio\n  // porque tienen el mismo destinatario (administracion); el flujo 04 los\n  // marca como aviso y no como alerta, para que no suenen igual.\n  DOCUMENTO_INDEXADO: 'porteriaya-alertas',\n  RAG_SIN_RESPUESTA: 'porteriaya-alertas',\n};\n\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const evento = item.json.body || item.json;\n\n  // El secreto compartido de §10. Si no cuadra, no se reenvia nada.\n  if (esperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== esperado) {\n      throw new Error('X-Porteria-Secret invalido: evento descartado');\n    }\n  }\n\n  const destino = DESTINO[evento.tipo];\n  if (!destino) {\n    // Un tipo de evento nuevo no debe tumbar el enrutador: queda en el log\n    // de la ejecucion y se ignora.\n    console.log('Evento sin flujo asignado, se ignora: ' + evento.tipo);\n    continue;\n  }\n\n  salida.push({ json: { destino, evento } });\n}\n\nreturn salida;\n"
+      },
+      "id": "a0000000-0000-4000-8000-000000000002",
+      "name": "Validar y enrutar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.N8N_URL_INTERNA || 'http://localhost:5678') + '/webhook/' + $json.destino }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Porteria-Secret",
+              "value": "={{ $env.PORTERIA_SECRET }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.evento) }}",
+        "options": {}
+      },
+      "id": "a0000000-0000-4000-8000-000000000003",
+      "name": "Reenviar al flujo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 0]
+    }
+  ],
+  "connections": {
+    "Webhook PorteriaYa": {
+      "main": [[{ "node": "Validar y enrutar", "type": "main", "index": 0 }]]
+    },
+    "Validar y enrutar": {
+      "main": [[{ "node": "Reenviar al flujo", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -118,17 +118,60 @@ funcionando con normalidad**.
 
 ## Automatización (n8n)
 
-`n8n/workflows/porteriaya-avisos.json` es importable y no lleva credenciales.
+Los siete flujos de `CLAUDE.md` §14 están en `n8n/workflows/`, cada uno en su JSON importable y sin
+credenciales. Son ocho archivos porque hay un **enrutador** delante:
 
-Es **un** flujo con enrutado por tipo de evento, no los siete sueltos que describe `CLAUDE.md` §14:
-la aplicación publica todos los eventos a una única URL de webhook, así que un flujo que enruta es
-lo que encaja con lo construido. Dentro están las cuatro ramas obligatorias (visitas, aprobación en
-vivo, paquetes y alertas de seguridad).
+| Archivo | Qué hace | Se dispara con |
+| --- | --- | --- |
+| `00-enrutador.json` | Valida `X-Porteria-Secret` y reparte el evento al flujo que le toca | webhook `porteriaya` |
+| `01-visitas.json` | Código de ingreso y aviso de que el visitante entró | el enrutador |
+| `02-aprobacion-en-vivo.json` | Aprobar o rechazar la visita no anunciada | el enrutador |
+| `03-paquetes.json` | Recepción, recordatorios de 24 h y 72 h, escalamiento a los 7 días | el enrutador |
+| `04-alertas-seguridad.json` | Persona no permitida, permanencia excedida, salida no registrada | el enrutador |
+| `05-ingesta-documentos.json` | Descarga un documento por URL y lo sube al asistente | webhook `porteriaya-ingesta` |
+| `06-bot-telegram.json` | Preguntar al asistente desde Telegram | mensaje de Telegram |
+| `07-resumen-semanal.json` | Cifras del conjunto por correo a administración | cron, lunes 7:00 |
 
-Para importarlo: crea una credencial SMTP llamada **Mailpit** (host `mailpit`, puerto `1025`, sin
-autenticación) y define `PORTERIA_SECRET` y `CORREO_ADMINISTRACION` como variables de entorno de n8n.
-Las alertas de seguridad salen por correo; en producción esa rama debería ir por Telegram, que es
-cambiar un nodo.
+**Por qué hace falta el enrutador.** La aplicación publica *todos* los eventos a una sola URL
+(`porteria.n8n.webhook-url`), así que algo tiene que repartirlos. El enrutador valida el secreto una
+vez y reenvía el evento intacto por HTTP al webhook del flujo correspondiente. Reparte por nombre de
+webhook y no con nodos *Execute Workflow* a propósito: esos referencian el workflow por ID, y los ID
+se asignan al importar, así que habría que cablearlos a mano después de cada importación.
+
+### Para importarlos
+
+1. Crea una credencial SMTP llamada **Mailpit**: host `mailpit`, puerto `1025`, sin autenticación,
+   sin TLS. Los flujos la referencian por nombre; el `id` va como `REEMPLAZAR` y n8n lo resuelve al
+   seleccionarla en el nodo.
+2. Importa los ocho JSON y **actívalos**. Un flujo con webhook inactivo no recibe nada.
+3. Las variables de entorno las pasa ya `docker-compose.yml` desde tu `.env`: `PORTERIA_SECRET`,
+   `PORTERIA_BASE_URL`, `PORTERIA_URL_PUBLICA`, `CORREO_ADMINISTRACION` y `ADMIN_PIN`.
+
+Los flujos 06 y 07 arrancan solos (uno por mensaje de Telegram, el otro por cron); el 06 necesita
+además una credencial `telegramApi` con el token del bot.
+
+### Tres decisiones dentro de los flujos
+
+**El QR no va incrustado en el correo.** Generarlo en n8n obligaría a mandar el código de 6 dígitos
+a un servicio externo de imágenes, y ese código abre la puerta del conjunto. El correo lleva el
+código y un enlace a `residente.html`, donde el QR se genera en el navegador.
+
+**Telegram llega desactivado.** §14 pide Telegram para las alertas de seguridad, y el nodo está
+puesto en los flujos 02 y 04, pero `disabled: true`: el proyecto no trae token de bot, y con Mailpit
+todo es demostrable sin cuentas externas. Activarlo es crear la credencial, poner `TELEGRAM_CHAT_ID`
+y pulsar el interruptor del nodo.
+
+**El resumen semanal no lleva un nodo de LLM**, aunque §14 lo titule «con IA». La lógica de IA vive
+en Spring (§10), y no hay endpoint que resuma la operación: `/api/rag/preguntar` solo responde con
+lo que está en los documentos del reglamento, que no son estas cifras. Escribir un prompt en n8n
+sería exactamente lo que el contrato prohíbe. Para tenerlo redactado por un modelo hace falta un
+endpoint nuevo en Spring que use el `LlmClient` que ya existe.
+
+Dos detalles más, por si extrañan: el flujo 04 también transporta `DOCUMENTO_INDEXADO` y
+`RAG_SIN_RESPUESTA`, que §10 emite pero §14 no asigna a ningún flujo — van ahí porque comparten
+destinatario, marcados con `severidad: 'aviso'` para que no se confundan con una alerta. Y el bot de
+Telegram consulta como **RESIDENTE**, el rol más restrictivo, para que un chat no sirva para sacar
+los protocolos de vigilancia.
 
 ---
 
@@ -151,13 +194,25 @@ Es un MVP y no la entrega final. Lo que está comprobado y lo que no:
 | Compilación completa | ✅ |
 | Pasos 1 y 2 con `./mvnw verify` | ✅ verificados en su momento |
 | `./mvnw verify` para los pasos 3 y 4 | ⚠️ **sin ejecutar**: Docker estaba abajo |
-| RAG, vistas y flujo de n8n | ⚠️ **sin probar contra el sistema real** |
+| RAG y las cuatro vistas | ⚠️ **sin probar contra el sistema real** |
+| Los ocho flujos de n8n | ⚠️ **nunca importados en n8n**: el JSON es válido y el JS de los nodos Code compila, pero las versiones de nodo y las expresiones no se han comprobado dentro de n8n |
 | Evaluación RAG de 20 preguntas (`CLAUDE.md` §11) | ⚠️ sin escribir; el umbral `0.55` está sin calibrar |
 | `POST /api/demo/avanzar` | ⚠️ sin prueba automática |
 
 **Lo primero al retomar:** levantar Docker y correr `./mvnw verify`, luego recorrer el guion de demo
-de `CLAUDE.md` §19 en el navegador. Es razonable esperar ajustes en el RAG y en el JSON de n8n, que
-nunca han corrido contra Qdrant, Ollama ni n8n de verdad.
+de `CLAUDE.md` §19 en el navegador. Es razonable esperar ajustes en el RAG y en los flujos de n8n,
+que nunca han corrido contra Qdrant, Ollama ni n8n de verdad.
+
+Los flujos tienen su propio comprobador, que no necesita Docker:
+
+```bash
+node n8n/valida-flujos.js n8n/workflows
+```
+
+Comprueba que cada JSON parsea, que el JS de los nodos Code compila, que ninguna conexión apunta a
+un nodo que no existe, que no hay nodos sueltos y que no se cuela ningún `id` de credencial real.
+Lo que **no** puede comprobar es si los `typeVersion` de los nodos y las expresiones `{{ }}` son los
+que espera n8n 2.47: eso solo se ve importando.
 
 ---
 
@@ -232,7 +287,9 @@ src/main/resources/
   static/        index, residente, porteria, admin + js/api.js
   db/migration/  V1 esquema, V2 char→varchar, V3 contenido del documento
   rag/seed/      reglamento y protocolo de ejemplo
-n8n/workflows/   flujo importable
+n8n/
+  workflows/     enrutador + los siete flujos de §14, importables
+  valida-flujos.js   comprobador de los flujos, sin Docker
 ```
 
 ## Requisitos

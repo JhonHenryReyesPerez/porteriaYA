@@ -1,0 +1,99 @@
+{
+  "name": "PorteriaYa 07 - Resumen semanal",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [1],
+              "triggerAtHour": 7,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "a7000000-0000-4000-8000-000000000001",
+      "name": "Lunes a las 7",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-320, 0],
+      "notesInFlow": true,
+      "notes": "El contenedor de n8n va en America/Bogota (GENERIC_TIMEZONE), asi que las 7 son las 7 de Bogota."
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.PORTERIA_BASE_URL || 'http://host.docker.internal:8080') + '/api/dashboard/stats' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Rol",
+              "value": "ADMINISTRADOR"
+            },
+            {
+              "name": "X-Actor",
+              "value": "n8n-resumen"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a7000000-0000-4000-8000-000000000002",
+      "name": "Leer las metricas",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-100, 0],
+      "notesInFlow": true,
+      "notes": "/api/dashboard/stats devuelve una FOTO del momento, no un agregado de la semana: no existe endpoint de agregados por periodo. El correo sale cada lunes, pero lo que cuenta es el estado de ese lunes."
+    },
+    {
+      "parameters": {
+        "jsCode": "// §14.7 Resumen semanal, por correo a administracion.\n//\n// §14 lo titula «con IA» y aqui NO hay un nodo de LLM, a proposito: el\n// principio del proyecto es que la logica de IA vive en Spring (§10, §14), y\n// no existe un endpoint que resuma la operacion. /api/rag/preguntar responde\n// solo con lo que hay en los documentos del reglamento, que no son estos\n// numeros. Escribir aqui un prompt seria exactamente poner logica de IA en\n// n8n, que es lo que el contrato prohibe.\n//\n// Si se quiere el resumen redactado por un modelo, lo que toca es un endpoint\n// nuevo en Spring que use el LlmClient que ya existe, y que este flujo llame\n// a ese endpoint. Mientras eso no exista, el resumen son las cifras.\n\nconst s = $json || {};\nconst t = s.tarjetas || {};\nconst p = s.paquetesPorAntiguedad || {};\nconst horas = Array.isArray(s.visitasPorHoraHoy) ? s.visitasPorHoraHoy : [];\n\nlet punta = 0;\nfor (let i = 1; i < horas.length; i++) {\n  if (horas[i] > horas[punta]) {\n    punta = i;\n  }\n}\nconst huboTrafico = horas.length > 0 && horas[punta] > 0;\n\nconst n = (v) => (v === null || v === undefined ? '-' : String(v));\n\nconst texto = [\n  'Estado del conjunto a esta hora.',\n  '',\n  'AHORA MISMO',\n  '  Personas dentro:             ' + n(t.personasDentro),\n  '  Ingresos de hoy:             ' + n(t.ingresosHoy),\n  '  Autorizaciones activas:      ' + n(t.autorizacionesActivas),\n  '  Solicitudes pendientes:      ' + n(t.solicitudesPendientes),\n  '',\n  'PENDIENTES DE ATENCION',\n  '  Paquetes sin retirar:        ' + n(t.paquetesPendientes),\n  '    menos de 24 h:             ' + n(p.menosDe24Horas),\n  '    entre 24 y 72 h:           ' + n(p.entre24Y72Horas),\n  '    entre 72 h y 7 dias:       ' + n(p.entre72HorasY7Dias),\n  '    mas de 7 dias (escalados): ' + n(p.masDe7Dias),\n  '  Salidas no registradas:      ' + n(t.salidasNoRegistradas),\n  '  Personas no permitidas:      ' + n(t.noPermitidosActivos),\n  '',\n  huboTrafico\n    ? 'La hora de mas trafico hoy fue la de las ' + punta + ':00, con ' + horas[punta] + ' ingresos.'\n    : 'Hoy todavia no se han registrado ingresos.',\n  '',\n  'Los paquetes de mas de 7 dias son exactamente los que ya se escalaron a',\n  'administracion: si ese numero no baja de una semana a otra, hay un paquete',\n  'que nadie esta reclamando.',\n  '',\n  'Solo cifras agregadas: este correo no lleva nombres de residentes ni de',\n  'visitantes (§6).',\n].join('\\n');\n\nreturn [{\n  json: {\n    destinatario: $env.CORREO_ADMINISTRACION || 'administracion@example.test',\n    asunto: 'Resumen semanal de PorteriaYa',\n    texto,\n  },\n}];\n"
+      },
+      "id": "a7000000-0000-4000-8000-000000000003",
+      "name": "Redactar el resumen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "porteria@altosdelparque.test",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {}
+      },
+      "id": "a7000000-0000-4000-8000-000000000004",
+      "name": "Enviar a administracion",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [340, 0],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "Mailpit"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Lunes a las 7": {
+      "main": [[{ "node": "Leer las metricas", "type": "main", "index": 0 }]]
+    },
+    "Leer las metricas": {
+      "main": [[{ "node": "Redactar el resumen", "type": "main", "index": 0 }]]
+    },
+    "Redactar el resumen": {
+      "main": [[{ "node": "Enviar a administracion", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

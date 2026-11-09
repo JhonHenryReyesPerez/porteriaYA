@@ -1,0 +1,64 @@
+{
+  "name": "PorteriaYa 01 - Visitas",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya-visitas",
+        "responseMode": "onReceived",
+        "responseData": "{\"recibido\":true}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Evento de visita",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "webhookId": "porteriaya-visitas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// §14.1 Visitas: el codigo para el visitante y el aviso de que ya entro.\n//\n// Aqui solo se redacta. La ventana de validez, los usos y el consumo del uso\n// ya los decidio Spring (§10); n8n no recalcula nada de eso.\n\nconst esperado = $env.PORTERIA_SECRET;\nconst publica = $env.PORTERIA_URL_PUBLICA || 'http://localhost:8080';\nconst admin = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const evento = item.json.body || item.json;\n\n  if (esperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== esperado) {\n      throw new Error('X-Porteria-Secret invalido: evento descartado');\n    }\n  }\n\n  const d = evento.datos || {};\n  const apto = d.apartamento || 'sin apartamento';\n  const destinatario = d.correoResidente || admin;\n  let asunto;\n  let texto;\n\n  if (evento.tipo === 'AUTORIZACION_CREADA') {\n    asunto = 'Codigo de ingreso para ' + d.visitanteNombre;\n    texto = [\n      'Autorizaste el ingreso de ' + d.visitanteNombre + ' al apartamento ' + apto + '.',\n      '',\n      'CODIGO: ' + d.codigo,\n      '',\n      'Valido desde ' + d.validaDesde + ' hasta ' + d.validaHasta + '.',\n      'Comparte este codigo con tu visitante. En la porteria lo pediran junto',\n      'con su nombre y los ultimos cuatro digitos del documento.',\n      '',\n      // El QR NO va incrustado en el correo, y es a proposito: generarlo aqui\n      // obligaria a mandar el codigo a un servicio externo de imagenes, y ese\n      // codigo abre la puerta del conjunto (§16). El QR se genera en el\n      // navegador del residente, que es donde el codigo ya esta.\n      'Ver el codigo QR: ' + publica + '/residente.html',\n    ].join('\\n');\n\n  } else if (evento.tipo === 'INGRESO_REGISTRADO') {\n    asunto = d.visitanteNombre + ' acaba de ingresar';\n    texto = [\n      d.visitanteNombre + ' ingreso al apartamento ' + apto + '.',\n      'Registrado por ' + d.vigilante + ' a las ' + d.ingresoEn + '.',\n      d.origen === 'NO_ANUNCIADA'\n        ? 'Entro con tu aprobacion de la visita no anunciada.'\n        : '',\n      '',\n      'Si no esperabas esta visita, avisa a la porteria.',\n    ].filter(Boolean).join('\\n');\n\n  } else {\n    console.log('Tipo que no corresponde a este flujo: ' + evento.tipo);\n    continue;\n  }\n\n  salida.push({ json: { tipo: evento.tipo, destinatario, asunto, texto } });\n}\n\nreturn salida;\n"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Redactar aviso de visita",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "porteria@altosdelparque.test",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Enviar al residente",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [240, 0],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "Mailpit"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Evento de visita": {
+      "main": [[{ "node": "Redactar aviso de visita", "type": "main", "index": 0 }]]
+    },
+    "Redactar aviso de visita": {
+      "main": [[{ "node": "Enviar al residente", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

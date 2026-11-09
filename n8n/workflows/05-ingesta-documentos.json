@@ -1,0 +1,105 @@
+{
+  "name": "PorteriaYa 05 - Ingesta de documentos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya-ingesta",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "a5000000-0000-4000-8000-000000000001",
+      "name": "Peticion de ingesta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-320, 0],
+      "webhookId": "porteriaya-ingesta"
+    },
+    {
+      "parameters": {
+        "jsCode": "// §14.5 Ingesta de documentos: trae un archivo por URL y lo sube al asistente.\n//\n// El flujo solo transporta (§14): la extraccion de texto, el chunking, los\n// embeddings, el hash que evita reindexar lo mismo y el borrado de los chunks\n// de la version anterior pasan TODOS dentro de Spring. Aqui no hay ni una\n// decision sobre el documento.\n//\n// Cuerpo esperado:\n//   {\n//     \"url\": \"https://.../reglamento.pdf\",\n//     \"titulo\": \"Reglamento de convivencia\",\n//     \"tipo\": \"REGLAMENTO\",          // REGLAMENTO | PROTOCOLO | CIRCULAR | FAQ\n//     \"audiencias\": \"TODOS\",         // TODOS, o lista: \"VIGILANTE,ADMINISTRADOR\"\n//     \"version\": \"2\"\n//   }\n\nconst esperado = $env.PORTERIA_SECRET;\nconst TIPOS = ['REGLAMENTO', 'PROTOCOLO', 'CIRCULAR', 'FAQ'];\nconst AUDIENCIAS = ['TODOS', 'RESIDENTE', 'VIGILANTE', 'ADMINISTRADOR'];\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const p = item.json.body || item.json;\n\n  // Este webhook termina llamando a un endpoint de administrador CON el PIN.\n  // Sin validar el secreto seria una puerta abierta para indexar cualquier\n  // cosa en el reglamento del conjunto (§16).\n  if (esperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== esperado) {\n      throw new Error('X-Porteria-Secret invalido: ingesta descartada');\n    }\n  }\n\n  if (!p.url || !p.titulo) {\n    throw new Error('Faltan url o titulo en el cuerpo de la peticion');\n  }\n\n  const tipo = String(p.tipo || 'REGLAMENTO').toUpperCase();\n  if (!TIPOS.includes(tipo)) {\n    throw new Error('Tipo no valido: ' + tipo + '. Validos: ' + TIPOS.join(', '));\n  }\n\n  const audiencias = String(p.audiencias || 'TODOS').toUpperCase();\n  for (const a of audiencias.split(',').map((s) => s.trim())) {\n    if (!AUDIENCIAS.includes(a)) {\n      throw new Error('Audiencia no valida: ' + a + '. Validas: ' + AUDIENCIAS.join(', '));\n    }\n  }\n\n  salida.push({\n    json: {\n      url: p.url,\n      titulo: p.titulo,\n      tipo,\n      audiencias,\n      version: String(p.version || '1'),\n    },\n  });\n}\n\nreturn salida;\n"
+      },
+      "id": "a5000000-0000-4000-8000-000000000002",
+      "name": "Validar peticion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-100, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "a5000000-0000-4000-8000-000000000003",
+      "name": "Descargar el archivo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [120, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.PORTERIA_BASE_URL || 'http://host.docker.internal:8080') + '/api/rag/documentos'\n  + '?titulo=' + encodeURIComponent($('Validar peticion').item.json.titulo)\n  + '&tipo=' + $('Validar peticion').item.json.tipo\n  + '&audiencias=' + encodeURIComponent($('Validar peticion').item.json.audiencias)\n  + '&version=' + encodeURIComponent($('Validar peticion').item.json.version) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Rol",
+              "value": "ADMINISTRADOR"
+            },
+            {
+              "name": "X-Actor",
+              "value": "n8n-ingesta"
+            },
+            {
+              "name": "X-Admin-Pin",
+              "value": "={{ $env.ADMIN_PIN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "archivo",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a5000000-0000-4000-8000-000000000004",
+      "name": "Subir al asistente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, 0],
+      "notesInFlow": true,
+      "notes": "Solo administrador puede subir documentos (§7), asi que esta llamada lleva X-Rol y X-Admin-Pin. El PIN sale del entorno de n8n, no del cuerpo de la peticion. La respuesta vuelve con estado SUBIDO o INDEXANDO: la indexacion corre en segundo plano y se consulta en GET /api/rag/documentos."
+    }
+  ],
+  "connections": {
+    "Peticion de ingesta": {
+      "main": [[{ "node": "Validar peticion", "type": "main", "index": 0 }]]
+    },
+    "Validar peticion": {
+      "main": [[{ "node": "Descargar el archivo", "type": "main", "index": 0 }]]
+    },
+    "Descargar el archivo": {
+      "main": [[{ "node": "Subir al asistente", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,92 @@
+{
+  "name": "PorteriaYa 02 - Aprobacion en vivo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya-aprobacion",
+        "responseMode": "onReceived",
+        "responseData": "{\"recibido\":true}",
+        "options": {}
+      },
+      "id": "a2000000-0000-4000-8000-000000000001",
+      "name": "Visita no anunciada",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "webhookId": "porteriaya-aprobacion"
+    },
+    {
+      "parameters": {
+        "jsCode": "// §14.2 Aprobacion en vivo: el residente decide desde el correo o Telegram.\n//\n// Los dos enlaces (urlAprobar, urlRechazar) los construye Spring con el token\n// de un solo uso ya hasheado en base. n8n NO los arma ni los firma: solo los\n// transporta.\n//\n// Importante: esos enlaces llevan a una PAGINA DE CONFIRMACION (GET), que no\n// decide nada. El boton de esa pagina hace el POST que aplica la decision.\n// Es justo por esto: Gmail, Outlook y Telegram pre-cargan los enlaces de un\n// mensaje, y con un GET que aprobara ese prefetch quemaria el token y\n// decidiria sin que el residente toque nada.\n\nconst esperado = $env.PORTERIA_SECRET;\nconst admin = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const evento = item.json.body || item.json;\n\n  if (esperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== esperado) {\n      throw new Error('X-Porteria-Secret invalido: evento descartado');\n    }\n  }\n\n  if (evento.tipo !== 'VISITA_NO_ANUNCIADA') {\n    console.log('Tipo que no corresponde a este flujo: ' + evento.tipo);\n    continue;\n  }\n\n  const d = evento.datos || {};\n  const apto = d.apartamento || 'sin apartamento';\n\n  salida.push({\n    json: {\n      tipo: evento.tipo,\n      destinatario: d.correoResidente || admin,\n      asunto: d.visitanteNombre + ' pide subir a tu apartamento',\n      texto: [\n        d.visitanteNombre + ' esta en la porteria del conjunto.',\n        'Apartamento: ' + apto + '.',\n        d.motivo ? 'Motivo: ' + d.motivo : '',\n        d.vigilante ? 'Lo registro el vigilante ' + d.vigilante + '.' : '',\n        '',\n        'APROBAR:  ' + d.urlAprobar,\n        'RECHAZAR: ' + d.urlRechazar,\n        '',\n        'Tienes hasta ' + d.venceEn + ' para responder.',\n        'Si no respondes, la decision queda en manos del vigilante.',\n        '',\n        'Los enlaces abren una pagina de confirmacion y sirven una sola vez.',\n      ].filter(Boolean).join('\\n'),\n    },\n  });\n}\n\nreturn salida;\n"
+      },
+      "id": "a2000000-0000-4000-8000-000000000002",
+      "name": "Redactar peticion de aprobacion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "porteria@altosdelparque.test",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {}
+      },
+      "id": "a2000000-0000-4000-8000-000000000003",
+      "name": "Preguntar por correo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [240, -100],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "Mailpit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.asunto + '\\n\\n' + $json.texto }}",
+        "additionalFields": {}
+      },
+      "id": "a2000000-0000-4000-8000-000000000004",
+      "name": "Preguntar por Telegram (desactivado)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [240, 120],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "§14.2 permite correo o Telegram. Llega desactivado porque el proyecto no trae credencial de Telegram: crea una (telegramApi), define TELEGRAM_CHAT_ID y activalo. Si activas los dos, el residente recibe el aviso dos veces.",
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "Telegram PorteriaYa"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Visita no anunciada": {
+      "main": [[{ "node": "Redactar peticion de aprobacion", "type": "main", "index": 0 }]]
+    },
+    "Redactar peticion de aprobacion": {
+      "main": [
+        [
+          { "node": "Preguntar por correo", "type": "main", "index": 0 },
+          { "node": "Preguntar por Telegram (desactivado)", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

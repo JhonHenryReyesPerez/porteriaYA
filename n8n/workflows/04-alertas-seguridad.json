@@ -1,0 +1,92 @@
+{
+  "name": "PorteriaYa 04 - Alertas de seguridad",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya-alertas",
+        "responseMode": "onReceived",
+        "responseData": "{\"recibido\":true}",
+        "options": {}
+      },
+      "id": "a4000000-0000-4000-8000-000000000001",
+      "name": "Alerta o aviso",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-240, 0],
+      "webhookId": "porteriaya-alertas"
+    },
+    {
+      "parameters": {
+        "jsCode": "// §14.4 Alertas de seguridad, inmediatas a administracion.\n//\n// Tres alertas de verdad:\n//   PERSONA_NO_PERMITIDA   intento de ingreso denegado\n//   PERMANENCIA_EXCEDIDA   alguien lleva mas tiempo dentro del esperado\n//   SALIDA_NO_REGISTRADA   cierre automatico sin registro de salida\n//\n// Y dos avisos administrativos que §10 emite pero §14 no asigna a ningun\n// flujo. Van aqui porque tienen el mismo destinatario, marcados con\n// severidad 'aviso' para que no se confundan con una alerta.\n//\n// Las tres alertas las decide Spring: el umbral de permanencia, la hora del\n// cierre automatico y el cotejo con la lista de no permitidos son reglas de\n// negocio, no de transporte (§10).\n\nconst esperado = $env.PORTERIA_SECRET;\nconst admin = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\nconst ALERTAS = ['PERSONA_NO_PERMITIDA', 'PERMANENCIA_EXCEDIDA', 'SALIDA_NO_REGISTRADA'];\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const evento = item.json.body || item.json;\n\n  if (esperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== esperado) {\n      throw new Error('X-Porteria-Secret invalido: evento descartado');\n    }\n  }\n\n  const d = evento.datos || {};\n  const apto = d.apartamento || 'sin apartamento';\n  let asunto;\n  let texto;\n\n  switch (evento.tipo) {\n    case 'PERSONA_NO_PERMITIDA':\n      asunto = 'ALERTA: intento de ingreso de persona no permitida (' + apto + ')';\n      texto = [\n        'Se nego el ingreso de una persona que esta en la lista de no permitidos.',\n        '',\n        'Visitante: ' + d.visitanteNombre,\n        'Apartamento destino: ' + apto,\n        'Motivo del registro: ' + d.motivoRegistro,\n        'Vigilante: ' + d.vigilante,\n        '',\n        'El intento quedo en bitacora. Confirma por radio con la porteria.',\n      ].join('\\n');\n      break;\n\n    case 'PERMANENCIA_EXCEDIDA':\n      asunto = 'ALERTA: permanencia excedida en ' + apto;\n      texto = [\n        d.visitanteNombre + ' lleva mas tiempo del esperado en el apartamento ' + apto + '.',\n        '',\n        'Duracion esperada: ' + d.duracionEsperadaMin + ' minutos.',\n        'Ingreso: ' + d.ingresoEn + '.',\n        '',\n        'Este aviso sale una sola vez por ingreso. Verifica por camaras o ronda.',\n      ].join('\\n');\n      break;\n\n    case 'SALIDA_NO_REGISTRADA':\n      asunto = 'ALERTA: cierre automatico sin salida registrada (' + apto + ')';\n      texto = [\n        'El ingreso de ' + d.visitanteNombre + ' al apartamento ' + apto + ' se cerro',\n        'automaticamente sin que la porteria registrara la salida.',\n        '',\n        'Ingreso: ' + d.ingresoEn + '.',\n        '',\n        'Revisa con el turno si la persona salio y no se registro.',\n      ].join('\\n');\n      break;\n\n    case 'DOCUMENTO_INDEXADO':\n      asunto = 'Documento indexado: ' + d.titulo;\n      texto = [\n        '\"' + d.titulo + '\" (' + d.tipo + ', version ' + d.version + ') quedo indexado',\n        'con ' + d.chunks + ' fragmentos. El asistente ya puede citarlo.',\n      ].join('\\n');\n      break;\n\n    case 'RAG_SIN_RESPUESTA':\n      asunto = 'El asistente no encontro una respuesta';\n      texto = [\n        'Alguien pregunto algo que no esta en los documentos del conjunto:',\n        '',\n        '\"' + d.pregunta + '\"',\n        '',\n        'Rol: ' + d.rol + '. Mejor similitud encontrada: ' + d.mejorSimilitud + '.',\n        '',\n        'Esta es la lista de lo que convendria documentar. Tambien se ve en el',\n        'panel de administracion, en Preguntas sin respuesta.',\n      ].join('\\n');\n      break;\n\n    default:\n      console.log('Tipo que no corresponde a este flujo: ' + evento.tipo);\n      continue;\n  }\n\n  salida.push({\n    json: {\n      tipo: evento.tipo,\n      severidad: ALERTAS.includes(evento.tipo) ? 'alerta' : 'aviso',\n      destinatario: admin,\n      asunto,\n      texto,\n    },\n  });\n}\n\nreturn salida;\n"
+      },
+      "id": "a4000000-0000-4000-8000-000000000002",
+      "name": "Redactar alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "porteria@altosdelparque.test",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {}
+      },
+      "id": "a4000000-0000-4000-8000-000000000003",
+      "name": "Avisar por correo",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [240, -100],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "Mailpit"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.asunto + '\\n\\n' + $json.texto }}",
+        "additionalFields": {}
+      },
+      "id": "a4000000-0000-4000-8000-000000000004",
+      "name": "Avisar por Telegram (desactivado)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [240, 120],
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "§14.4 pide Telegram inmediato. Llega desactivado porque el proyecto no trae credencial de Telegram: crea una (telegramApi), define TELEGRAM_CHAT_ID y activalo; si no lo quieres por duplicado, desactiva el nodo de correo. Tal cual, al activarlo tambien saldran por Telegram los dos avisos del RAG: para que solo salgan las tres alertas, mete un IF sobre severidad === 'alerta' antes de este nodo.",
+      "credentials": {
+        "telegramApi": {
+          "id": "REEMPLAZAR",
+          "name": "Telegram PorteriaYa"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Alerta o aviso": {
+      "main": [[{ "node": "Redactar alerta", "type": "main", "index": 0 }]]
+    },
+    "Redactar alerta": {
+      "main": [
+        [
+          { "node": "Avisar por correo", "type": "main", "index": 0 },
+          { "node": "Avisar por Telegram (desactivado)", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}

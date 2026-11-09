@@ -65,9 +65,25 @@ services:
       N8N_SECURE_COOKIE: "false"
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
       N8N_DIAGNOSTICS_ENABLED: "false"
+      # Los nodos Code leen el secreto y los correos de $env (§10)
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       # SMTP de pruebas: Mailpit, dentro de la misma red
       N8N_SMTP_HOST: mailpit
       N8N_SMTP_PORT: "1025"
+      # Lo que necesitan los flujos de /n8n/workflows
+      # El PIN de administrador: el flujo 05 llama a POST /api/rag/documentos,
+      # que es endpoint de administrador (§7). Queda del lado del servidor;
+      # nunca llega a un navegador.
+      ADMIN_PIN: ${ADMIN_PIN}
+      CORREO_ADMINISTRACION: ${CORREO_ADMINISTRACION:-administracion@example.test}
+      # URL con la que el RESIDENTE abre la app desde su navegador, distinta de
+      # PORTERIA_BASE_URL, que es la que usa n8n desde dentro de Docker.
+      PORTERIA_URL_PUBLICA: ${PORTERIA_URL_PUBLICA:-http://localhost:8080}
+      # El enrutador (flujo 00) reparte por HTTP a los webhooks de los flujos 01-04.
+      N8N_URL_INTERNA: http://localhost:5678
+      # Solo para los nodos de Telegram, que llegan desactivados.
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TELEGRAM_ROL: ${TELEGRAM_ROL:-RESIDENTE}
     volumes:
       - n8n-data:/home/node/.n8n
     extra_hosts:
