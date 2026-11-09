@@ -15,4 +15,9 @@ public interface NoPermitidoRepository extends JpaRepository<NoPermitido, Long> 
      * columna nombre_normalizado indexada y comparar en la consulta.
      */
     List<NoPermitido> findByActivoTrue();
+
+    /** Para el panel de administracion: tambien los desactivados, como historial. */
+    List<NoPermitido> findAllByOrderByActivoDescCreadoEnDesc();
+
+    long countByActivoTrue();
 }

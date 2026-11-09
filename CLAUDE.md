@@ -54,7 +54,8 @@ Antes de dar una tarea por terminada: `./mvnw verify` en verde y probar el flujo
 /src/main/java/co/porteriaya
   /config          # Clock, Async, Scheduling, CORS, propiedades tipadas, seguridad por secreto
   /autorizacion    # entity, repository, service, controller, dto, mapper
-  /porteria        # validación de códigos, ingresos, salidas, solicitudes no anunciadas
+  /porteria        # validación de códigos, ingresos y salidas
+  /solicitud       # visitas no anunciadas y token de aprobación
   /paquete
   /residente
   /nopermitido
@@ -80,6 +81,8 @@ docker-compose.yml, .env.example
 ```
 
 Organiza por **dominio** (paquete por feature), no por capa técnica. Dentro de cada dominio: `entity`, `repository`, `service`, `controller`, `dto`.
+
+La visita no anunciada vive en `/solicitud` y no dentro de `/porteria` porque es una entidad propia con su propio ciclo de vida y su tabla de tokens, no un detalle del registro de ingresos. Las tareas de `@Scheduled` viven cada una en el service de su dominio; `/config/TareasProgramadas` solo las dispara en orden.
 
 ## 5. Convenciones de código
 

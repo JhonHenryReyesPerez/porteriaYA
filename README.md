@@ -58,8 +58,8 @@ El orden de construcción está en `CLAUDE.md` §17.
 
 - [x] **1. Infraestructura y esqueleto** — Compose, esqueleto Spring, Flyway con el esquema V1, semilla de demo
 - [x] **2. Entidades, autorizaciones con recurrencia, validación con uso atómico, bitácora**
-- [ ] 3. Ingresos y salidas, solicitud no anunciada con token, paquetes, `@Scheduled`, eventos
-- [ ] 4. No permitidas, `/dashboard/stats`, Swagger completo
+- [x] **3. Ingresos y salidas, solicitud no anunciada con token, paquetes, `@Scheduled`, eventos**
+- [x] **4. No permitidas, `/dashboard/stats`, Swagger completo**
 - [ ] 5. n8n: aprobación en vivo, paquetes, alertas de seguridad
 - [ ] 6. Interfaz de las tres vistas
 - [ ] 7. RAG: ingesta, embeddings, Qdrant, consulta con citas, evaluación
