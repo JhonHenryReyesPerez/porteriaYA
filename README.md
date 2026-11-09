@@ -72,6 +72,22 @@ en el paso 3. `POST /api/demo/avanzar` tampoco existe todavía. El reloj simulad
 `demo` ya está, pero el endpoint debe además disparar la pasada del scheduler (§9), y el
 scheduler nace en el paso 3.
 
+## Estado de verificación
+
+Lo que está comprobado y lo que no, a 8 de noviembre de 2026:
+
+| | Estado |
+| --- | --- |
+| `./mvnw test` (159 unitarias, sin Docker) | ✅ en verde |
+| Compilación completa, incluidas las pruebas de integración | ✅ |
+| `./mvnw verify` para los pasos 3 y 4 | ⚠️ **sin ejecutar**: Docker estaba abajo |
+| `POST /api/demo/avanzar` | ⚠️ sin prueba automática; falta probarlo a mano |
+| Pruebas de integración de los endpoints del paso 4 | ⚠️ sin escribir |
+
+**Lo primero al retomar:** levantar Docker y correr `./mvnw verify`. `SolicitudIT`
+y `PaqueteIT` están escritos pero nunca se han ejecutado, así que es razonable
+esperar algún ajuste.
+
 ## Seguridad: limitación conocida
 
 El proyecto **no tiene login**. El rol viaja en las cabeceras `X-Rol` y `X-Actor`, que son
