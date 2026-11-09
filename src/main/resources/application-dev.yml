@@ -1,0 +1,12 @@
+# Perfil dev: todo a la vista para depurar.
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+logging:
+  level:
+    co.porteriaya: DEBUG
+    org.flywaydb: DEBUG

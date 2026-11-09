@@ -1,0 +1,95 @@
+# Configuracion comun. Los valores sensibles salen de .env (§16), nunca del repo.
+spring:
+  application:
+    name: porteriaya
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/porteriaya}
+    username: ${POSTGRES_USER:porteriaya}
+    password: ${POSTGRES_PASSWORD:porteriaya}
+  jpa:
+    # El esquema lo manda Flyway; Hibernate solo verifica que coincide (§5)
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Bogota
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: America/Bogota
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      # Mismo valor que rag.subida.max-mb: una sola fuente para los dos (-> 413)
+      max-file-size: ${RAG_MAX_SUBIDA_MB:10}MB
+      max-request-size: ${RAG_MAX_SUBIDA_MB:10}MB
+
+server:
+  port: 8080
+  error:
+    # Nada de stack traces ni mensajes internos en las respuestas (§16)
+    include-stacktrace: never
+    include-message: never
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+# Tiempos, umbrales y limites de porteria (§5)
+porteria:
+  base-url: ${PORTERIA_BASE_URL:http://localhost:8080}
+  admin:
+    pin: ${ADMIN_PIN:}
+  cors:
+    origenes:
+      - http://localhost:8080
+  aprobacion:
+    timeout-minutos: 3
+    token-vigencia-minutos: 10
+  permanencia:
+    gracia-minutos: 30
+  paquete:
+    primer-recordatorio-horas: 24
+    segundo-recordatorio-horas: 72
+    escalamiento-dias: 7
+  n8n:
+    webhook-url: ${N8N_WEBHOOK_URL:http://localhost:5678/webhook/porteriaya}
+    secret: ${PORTERIA_SECRET:}
+
+# Parametros del RAG (§11)
+rag:
+  umbral: 0.55
+  top-k: 5
+  chunk:
+    # En caracteres: ~4 por token, para no meter un tokenizador en el stack
+    caracteres: 2400
+    solape: 400
+  embedding:
+    url: ${OLLAMA_URL:http://localhost:11434}
+    modelo: ${RAG_EMBEDDING_MODELO:nomic-embed-text}
+    dimension: 768
+  vector:
+    url: ${QDRANT_URL:http://localhost:6333}
+    coleccion-reglamento: reglamento
+    coleccion-incidentes: incidentes
+  llm:
+    proveedor: ${RAG_LLM_PROVEEDOR:ollama}
+    modelo: ${RAG_LLM_MODELO:llama3.2}
+    temperatura: 0.1
+    max-tokens: 800
+    api-key: ${ANTHROPIC_API_KEY:}
+  subida:
+    max-mb: ${RAG_MAX_SUBIDA_MB:10}
+    tipos-permitidos:
+      - application/pdf
+      - text/markdown
+      - text/plain
+
+logging:
+  level:
+    co.porteriaya: INFO

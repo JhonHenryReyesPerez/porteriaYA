@@ -1,0 +1,8 @@
+target/
+.git/
+.env
+.idea/
+.mvn/wrapper/*.jar
+docs/
+n8n/
+*.log

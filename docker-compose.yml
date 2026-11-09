@@ -1,0 +1,112 @@
+# PorteriaYa v2 — infraestructura local.
+#   docker compose up -d                  levanta postgres, qdrant, ollama, n8n, mailpit
+#   docker compose --profile app up -d    ademas construye y levanta la app
+# Los valores salen de .env (ver .env.example). Nunca credenciales literales aqui.
+name: porteriaya
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: porteriaya-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: America/Bogota
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.0
+    container_name: porteriaya-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  ollama:
+    image: ollama/ollama:0.40.15
+    container_name: porteriaya-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+
+  n8n:
+    image: n8nio/n8n:2.47.2
+    container_name: porteriaya-n8n
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      # n8n alcanza la app, que corre FUERA de Compose, por host.docker.internal
+      PORTERIA_BASE_URL: ${PORTERIA_BASE_URL}
+      PORTERIA_SECRET: ${PORTERIA_SECRET}
+      WEBHOOK_URL: http://localhost:${N8N_PORT:-5678}/
+      GENERIC_TIMEZONE: America/Bogota
+      TZ: America/Bogota
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      # SMTP de pruebas: Mailpit, dentro de la misma red
+      N8N_SMTP_HOST: mailpit
+      N8N_SMTP_PORT: "1025"
+    volumes:
+      - n8n-data:/home/node/.n8n
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      mailpit:
+        condition: service_started
+
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    container_name: porteriaya-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    environment:
+      TZ: America/Bogota
+      MP_MAX_MESSAGES: "500"
+
+  # Perfil aparte: `docker compose up -d` no debe construir la app (§3 la corre con ./mvnw)
+  app:
+    profiles: ["app"]
+    build:
+      context: .
+    container_name: porteriaya-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ADMIN_PIN: ${ADMIN_PIN}
+      PORTERIA_SECRET: ${PORTERIA_SECRET}
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/porteriaya
+      QDRANT_URL: http://qdrant:6333
+      OLLAMA_URL: http://ollama:11434
+      TZ: America/Bogota
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  qdrant-data:
+  ollama-data:
+  n8n-data:

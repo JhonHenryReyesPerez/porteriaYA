@@ -1,0 +1,5 @@
+# Perfil demo: reloj simulado (§9) y semilla idempotente (§12).
+# El reloj lo aporta ClockConfig#clockDemo; la semilla, SembradorDemo.
+logging:
+  level:
+    co.porteriaya: DEBUG

@@ -1,0 +1,32 @@
+# Secretos: nunca versionar (§16). Solo se versiona .env.example
+.env
+
+# Java / Maven
+target/
+*.class
+!.mvn/wrapper/maven-wrapper.jar
+
+# Volumenes locales de Compose
+/data/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+bin/
+
+# Sistema operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log
+
+# Ajustes locales de Claude Code (settings.json si se comparte, .local no)
+.claude/settings.local.json
