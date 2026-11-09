@@ -16,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -27,6 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * Si falla, el documento queda en ERROR con el motivo y la aplicacion sigue.
  * Indexar es una tarea de administracion, no parte del servicio de porteria.
+ *
+ * Arranca con AFTER_COMMIT y no con una llamada directa: el documento tiene que
+ * estar confirmado en la base antes de que este hilo lo busque. Ver
+ * {@link DocumentoParaIndexar}.
  */
 @Component
 @RequiredArgsConstructor
@@ -42,10 +48,16 @@ public class IndexadorDocumentos {
     private final Clock clock;
 
     @Async(AsyncConfig.EJECUTOR_EVENTOS)
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     @Transactional
-    public void indexar(Long documentoId, List<ExtractorTexto.BloqueTexto> bloques) {
+    public void indexar(DocumentoParaIndexar peticion) {
+        Long documentoId = peticion.documentoId();
+        List<ExtractorTexto.BloqueTexto> bloques = peticion.bloques();
+
         Documento documento = documentos.findById(documentoId).orElse(null);
         if (documento == null) {
+            // Ya no es la carrera de antes: con AFTER_COMMIT la fila esta
+            // confirmada. Si no esta, es que la borraron entre medias.
             log.warn("El documento {} desaparecio antes de indexarse", documentoId);
             return;
         }

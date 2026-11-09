@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,7 +36,7 @@ public class IngestaService {
 
     private final DocumentoRepository documentos;
     private final ExtractorTexto extractor;
-    private final IndexadorDocumentos indexador;
+    private final ApplicationEventPublisher publicador;
     private final VectorStore vectores;
     private final BitacoraService bitacora;
     private final RagProperties propiedades;
@@ -87,7 +88,7 @@ public class IngestaService {
                 "DOCUMENTO_SUBIDO",
                 "%s (%s) version %s".formatted(titulo, tipo, version));
 
-        indexador.indexar(documento.getId(), bloques);
+        publicador.publishEvent(new DocumentoParaIndexar(documento.getId(), bloques));
         return documento;
     }
 
@@ -116,7 +117,7 @@ public class IngestaService {
         bitacora.registrar(actor, Rol.ADMINISTRADOR, ENTIDAD, documento.getId(),
                 "DOCUMENTO_SUBIDO", "%s (semilla de demo)".formatted(titulo));
 
-        indexador.indexar(documento.getId(), bloques);
+        publicador.publishEvent(new DocumentoParaIndexar(documento.getId(), bloques));
         return documento;
     }
 
@@ -171,7 +172,8 @@ public class IngestaService {
                         documento.getId());
                 continue;
             }
-            indexador.indexar(documento.getId(), deserializar(documento.getContenido()));
+            publicador.publishEvent(new DocumentoParaIndexar(
+                    documento.getId(), deserializar(documento.getContenido())));
             lanzados++;
         }
 

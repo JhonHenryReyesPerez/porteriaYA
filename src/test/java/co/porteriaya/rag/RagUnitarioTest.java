@@ -2,6 +2,7 @@ package co.porteriaya.rag;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Set;
 
@@ -11,9 +12,14 @@ import co.porteriaya.rag.consulta.PromptRag;
 import co.porteriaya.rag.consulta.Sanitizador;
 import co.porteriaya.rag.documento.Audiencia;
 import co.porteriaya.rag.documento.Chunker;
+import co.porteriaya.rag.documento.DocumentoParaIndexar;
 import co.porteriaya.rag.documento.EstadoDocumento;
+import co.porteriaya.rag.documento.IndexadorDocumentos;
 import co.porteriaya.rag.vector.ResultadoBusqueda;
 import org.junit.jupiter.api.Test;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * Lo poco del RAG que tiene logica propia y merece prueba sin levantar nada:
@@ -172,5 +178,31 @@ class RagUnitarioTest {
         // Markdown no tiene paginas: solo el titulo
         assertThat(new ResultadoBusqueda(1L, "Protocolo", null, 0, "t", 0.9).fuente())
                 .isEqualTo("Protocolo");
+    }
+
+    // ------------------------------------------------ arranque de la indexacion
+
+    /**
+     * Esto no se puede comprobar de otra forma sin Ollama y Qdrant levantados,
+     * y el fallo que evita es invisible: el documento se queda en SUBIDO y lo
+     * unico que aparece es un aviso en el log.
+     */
+    @Test
+    void laIndexacionArrancaSoloDespuesDelCommit() throws Exception {
+        Method metodo = IndexadorDocumentos.class
+                .getMethod("indexar", DocumentoParaIndexar.class);
+
+        TransactionalEventListener listener = metodo.getAnnotation(TransactionalEventListener.class);
+
+        assertThat(listener)
+                .as("""
+                        Si se vuelve a llamar al indexador directamente desde la transaccion                         de IngestaService, el hilo asincrono buscara una fila que todavia no                         esta confirmada, no la encontrara, y el documento se quedara sin                         indexar para siempre.""")
+                .isNotNull();
+        assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+        // Reindexar puede lanzarse sin una transaccion alrededor
+        assertThat(listener.fallbackExecution()).isTrue();
+        assertThat(metodo.getAnnotation(Async.class))
+                .as("indexar en el hilo del commit bloquearia a quien subio el documento")
+                .isNotNull();
     }
 }
