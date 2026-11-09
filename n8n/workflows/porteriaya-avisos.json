@@ -1,0 +1,79 @@
+{
+  "name": "PorteriaYa - Avisos",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "porteriaya",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "c1f0a000-0000-4000-8000-000000000001",
+      "name": "Webhook PorteriaYa",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-220, 0],
+      "webhookId": "porteriaya"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enrutado y redaccion de los avisos de PorteriaYa.\n//\n// Aqui NO se calcula ninguna regla de negocio (§10): eso ya lo decidio Spring.\n// Lo unico que pasa en este nodo es convertir un evento en un asunto y un\n// cuerpo de correo. Si hace falta cambiar un plazo o un umbral, se cambia en\n// las propiedades de Spring, no aqui.\n\nconst secretoEsperado = $env.PORTERIA_SECRET;\nconst salida = [];\n\nfor (const item of $input.all()) {\n  const cabeceras = item.json.headers || {};\n  const cuerpo = item.json.body || item.json;\n\n  // El secreto compartido de §10. Si no cuadra, no se envia nada.\n  if (secretoEsperado) {\n    const recibido = cabeceras['x-porteria-secret'] || cabeceras['X-Porteria-Secret'];\n    if (recibido !== secretoEsperado) {\n      throw new Error('X-Porteria-Secret invalido: evento descartado');\n    }\n  }\n\n  const tipo = cuerpo.tipo;\n  const d = cuerpo.datos || {};\n  const apto = d.apartamento || 'sin apartamento';\n\n  let asunto;\n  let texto;\n  let destinatario = d.correoResidente || $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n\n  switch (tipo) {\n    // ---------------------------------------------- flujo 1: visitas\n    case 'AUTORIZACION_CREADA':\n      asunto = `Codigo de ingreso para ${d.visitanteNombre}`;\n      texto = [\n        `Autorizaste el ingreso de ${d.visitanteNombre} al apartamento ${apto}.`,\n        '',\n        `CODIGO: ${d.codigo}`,\n        '',\n        `Valido desde ${d.validaDesde} hasta ${d.validaHasta}.`,\n        'Comparte este codigo con tu visitante. En la porteria lo pediran junto',\n        'con su nombre y los ultimos cuatro digitos del documento.'\n      ].join('\\n');\n      break;\n\n    case 'INGRESO_REGISTRADO':\n      asunto = `${d.visitanteNombre} acaba de ingresar`;\n      texto = [\n        `${d.visitanteNombre} ingreso al apartamento ${apto}.`,\n        `Registrado por ${d.vigilante} a las ${d.ingresoEn}.`,\n        '',\n        'Si no esperabas esta visita, avisa a la porteria.'\n      ].join('\\n');\n      break;\n\n    // ------------------------------------- flujo 2: aprobacion en vivo\n    case 'VISITA_NO_ANUNCIADA':\n      asunto = `${d.visitanteNombre} pide subir a tu apartamento`;\n      texto = [\n        `${d.visitanteNombre} esta en la porteria del conjunto.`,\n        d.motivo ? `Motivo: ${d.motivo}` : '',\n        '',\n        'APROBAR:  ' + d.urlAprobar,\n        'RECHAZAR: ' + d.urlRechazar,\n        '',\n        `Tienes hasta ${d.venceEn} para responder.`,\n        'Si no respondes, la decision queda en manos del vigilante.',\n        '',\n        'Los enlaces abren una pagina de confirmacion y sirven una sola vez.'\n      ].filter(Boolean).join('\\n');\n      break;\n\n    // ----------------------------------------------- flujo 3: paquetes\n    case 'PAQUETE_RECIBIDO':\n      asunto = 'Tienes un paquete en porteria';\n      texto = [\n        `Llego un paquete para el apartamento ${apto}: ${d.descripcion}.`,\n        d.remitente ? `Remitente: ${d.remitente}` : '',\n        '',\n        `CODIGO DE RETIRO: ${d.codigoRetiro}`,\n        '',\n        'Presenta este codigo en porteria, o pide que lo retire alguien que',\n        'tengas registrado como autorizado.'\n      ].filter(Boolean).join('\\n');\n      break;\n\n    case 'PAQUETE_RECORDATORIO':\n      asunto = `Recordatorio: paquete sin retirar (${d.hitoHoras} h)`;\n      texto = [\n        `El paquete \"${d.descripcion}\" sigue en porteria.`,\n        `Lleva ${d.horasSinRetirar} horas sin retirar.`,\n        '',\n        'A los 7 dias se escala a la administracion.'\n      ].join('\\n');\n      break;\n\n    case 'PAQUETE_ESCALADO':\n      asunto = `Paquete escalado: apartamento ${apto}`;\n      texto = [\n        `El paquete \"${d.descripcion}\" del apartamento ${apto} lleva`,\n        `${d.diasSinRetirar} dias sin retirar y se escala a administracion.`,\n        '',\n        'Recibido el ' + d.recibidoEn\n      ].join('\\n');\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n      break;\n\n    // ------------------------------------ flujo 4: alertas de seguridad\n    // Van a administracion, no al residente. En produccion este es el\n    // ramal que deberia salir por Telegram: cambiar el nodo de correo\n    // por uno de Telegram y nada mas.\n    case 'PERSONA_NO_PERMITIDA':\n      asunto = `ALERTA: intento de ingreso de persona no permitida (${apto})`;\n      texto = [\n        'Se nego el ingreso de una persona que esta en la lista de no permitidos.',\n        '',\n        `Visitante: ${d.visitanteNombre}`,\n        `Apartamento destino: ${apto}`,\n        `Motivo del registro: ${d.motivoRegistro}`,\n        `Vigilante: ${d.vigilante}`,\n        '',\n        'Confirma por radio con la porteria.'\n      ].join('\\n');\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n      break;\n\n    case 'PERMANENCIA_EXCEDIDA':\n      asunto = `Permanencia excedida en ${apto}`;\n      texto = [\n        `${d.visitanteNombre} lleva mas tiempo del esperado en el apartamento ${apto}.`,\n        `Duracion esperada: ${d.duracionEsperadaMin} minutos. Ingreso: ${d.ingresoEn}.`,\n        '',\n        'Verifica por camaras o por ronda.'\n      ].join('\\n');\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n      break;\n\n    case 'SALIDA_NO_REGISTRADA':\n      asunto = `Cierre automatico: salida no registrada (${apto})`;\n      texto = [\n        `El ingreso de ${d.visitanteNombre} al apartamento ${apto} se cerro`,\n        'automaticamente sin registro de salida.',\n        '',\n        `Ingreso: ${d.ingresoEn}`\n      ].join('\\n');\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n      break;\n\n    // --------------------------------------------------- eventos del RAG\n    case 'DOCUMENTO_INDEXADO':\n      asunto = `Documento indexado: ${d.titulo}`;\n      texto = `\"${d.titulo}\" (${d.tipo}, v${d.version}) quedo indexado con ${d.chunks} fragmentos.`;\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n      break;\n\n    case 'RAG_SIN_RESPUESTA':\n      asunto = 'El asistente no encontro una respuesta';\n      texto = [\n        'Alguien pregunto algo que no esta en los documentos del conjunto:',\n        '',\n        `\"${d.pregunta}\"`,\n        '',\n        `Rol: ${d.rol}. Mejor similitud encontrada: ${d.mejorSimilitud}.`,\n        '',\n        'Conviene documentarlo.'\n      ].join('\\n');\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n      break;\n\n    default:\n      // Un tipo desconocido no debe tumbar el flujo: se registra y se ignora\n      asunto = `Evento sin plantilla: ${tipo}`;\n      texto = JSON.stringify(cuerpo, null, 2);\n      destinatario = $env.CORREO_ADMINISTRACION || 'administracion@example.test';\n  }\n\n  salida.push({ json: { tipo, destinatario, asunto, texto } });\n}\n\nreturn salida;\n"
+      },
+      "id": "c1f0a000-0000-4000-8000-000000000002",
+      "name": "Redactar aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [20, 0]
+    },
+    {
+      "parameters": {
+        "fromEmail": "porteria@altosdelparque.test",
+        "toEmail": "={{ $json.destinatario }}",
+        "subject": "={{ $json.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ $json.texto }}",
+        "options": {}
+      },
+      "id": "c1f0a000-0000-4000-8000-000000000003",
+      "name": "Enviar por Mailpit",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [260, 0],
+      "credentials": {
+        "smtp": {
+          "id": "REEMPLAZAR",
+          "name": "Mailpit"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook PorteriaYa": {
+      "main": [
+        [
+          {
+            "node": "Redactar aviso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redactar aviso": {
+      "main": [
+        [
+          {
+            "node": "Enviar por Mailpit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "tags": []
+}
