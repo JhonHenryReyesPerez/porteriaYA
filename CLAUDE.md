@@ -184,7 +184,7 @@ Rutas del contrato:
 - Visita no anunciada: `POST /api/porteria/solicitudes` (el vigilante la registra), `GET /api/porteria/solicitudes?estado=`, `PATCH /api/porteria/solicitudes/{id}/decision` (decisión del vigilante cuando quedó Sin respuesta). Esta última **reemplaza** a `PATCH /api/porteria/ingresos/{id}/decision` del contrato original, porque la solicitud es entidad propia y el Ingreso no existe todavía cuando se decide.
 - `GET /api/aprobacion/{token}?accion=` → página de confirmación, **sin efecto**; `POST /api/aprobacion/{token}` → consume el token y aplica la decisión.
 - `POST /api/paquetes`, `POST /api/paquetes/{id}/entregar`, `GET /api/paquetes?estado=&apto=`
-- `GET /api/residentes` (alimenta el selector de torre y apartamento), `GET/POST/DELETE /api/residentes/{id}/autorizados-retiro`
+- `GET /api/residentes` (alimenta el selector de torre y apartamento), `GET/POST /api/residentes/{id}/autorizados-retiro` y `DELETE /api/residentes/{id}/autorizados-retiro/{autorizadoId}` — el DELETE va sobre el recurso concreto y no sobre la colección, porque la ruta original no podía expresar a **quién** se retira la autorización; desactiva, no borra. El residente solo toca su propio apartamento: el id de la ruta se compara contra `X-Actor` y un cruce es 403.
 - `GET/POST /api/no-permitidos`, `DELETE /api/no-permitidos/{id}` (desactiva, no borra)
 - `GET /api/bitacora` (filtros fecha, actor, entidad)
 - `GET /api/dashboard/stats`

@@ -114,6 +114,29 @@
       <div id="listaPaquetes" class="space-y-2 text-sm text-slate-500">Cargando…</div>
     </section>
 
+    <!-- --------------------------------------------- autorizados a retirar -->
+    <section class="bg-white rounded-xl shadow-sm p-6">
+      <h2 class="font-semibold text-slate-900 mb-1">Autorizados a retirar paquetes</h2>
+      <p class="text-sm text-slate-500 mb-4">
+        Quien puede recoger tus paquetes <strong>sin</strong> el código del correo. En portería le
+        piden el nombre y los últimos 4 dígitos del documento, así que registrarlos evita que un
+        homónimo acredite por ti.
+      </p>
+      <div id="listaAutorizados" class="space-y-2 text-sm text-slate-500 mb-4">Cargando…</div>
+      <form id="formAutorizado" class="flex flex-wrap gap-2">
+        <label class="sr-only" for="autNombre">Nombre de la persona autorizada</label>
+        <input id="autNombre" required maxlength="120" placeholder="Nombre completo"
+               class="flex-1 min-w-48 border border-slate-300 rounded-lg px-3 py-2">
+        <label class="sr-only" for="autDoc4">Últimos 4 dígitos del documento</label>
+        <input id="autDoc4" inputmode="numeric" pattern="[0-9]{4}" maxlength="4"
+               placeholder="Doc (4 díg.)"
+               class="w-32 border border-slate-300 rounded-lg px-3 py-2">
+        <button class="bg-slate-900 text-white rounded-lg px-5 py-2 font-medium hover:bg-slate-800">
+          Autorizar
+        </button>
+      </form>
+    </section>
+
     <!-- ------------------------------------------------------------- chat -->
     <section class="bg-white rounded-xl shadow-sm p-6">
       <h2 class="font-semibold text-slate-900 mb-1">Pregunta al conjunto</h2>
@@ -144,9 +167,11 @@
       ajustarPorTipo();
       document.getElementById('tipo').addEventListener('change', ajustarPorTipo);
       document.getElementById('formAutorizacion').addEventListener('submit', crear);
+      document.getElementById('formAutorizado').addEventListener('submit', autorizar);
       montarChat({ hiloId: 'hilo', formId: 'formChat', entradaId: 'pregunta' });
       cargarAutorizaciones();
       cargarPaquetes();
+      cargarAutorizados();
 
       // Ventana por defecto: de ahora a ocho horas, que es el caso común
       const ahora = new Date();
@@ -286,6 +311,85 @@
           </div>`).join('');
       } catch (e) {
         caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    // ------------------------------------------- autorizados a retirar
+
+    // La ruta del contrato cuelga del id numérico del residente (§8), y la
+    // sesión solo guarda el identificador «A-101». GET /api/residentes trae
+    // los dos y es la lista que ya alimenta el selector de inicio, así que de
+    // ahí sale el id. Se resuelve una vez y se recuerda.
+    let residenteId = null;
+
+    async function miResidenteId() {
+      if (residenteId === null) {
+        const lista = await Api.get('/api/residentes');
+        const mio = lista.find((r) => r.identificador === Sesion.actor());
+        if (!mio) {
+          throw new Error(`No se encontró el apartamento ${Sesion.actor()}`);
+        }
+        residenteId = mio.id;
+      }
+      return residenteId;
+    }
+
+    async function cargarAutorizados() {
+      const caja = document.getElementById('listaAutorizados');
+      try {
+        const id = await miResidenteId();
+        const lista = await Api.get(`/api/residentes/${id}/autorizados-retiro`);
+        if (!lista.length) {
+          caja.innerHTML = '<p class="text-slate-500">'
+            + 'Nadie más puede retirar tus paquetes: hace falta el código del correo.</p>';
+          return;
+        }
+        caja.innerHTML = lista.map((a) => `
+          <div class="flex items-center justify-between border border-slate-200 rounded-lg p-3">
+            <div>
+              <p class="font-medium text-slate-900">${esc(a.nombre)}</p>
+              <p class="text-xs text-slate-500">
+                ${a.doc4 ? 'Documento ····' + esc(a.doc4) : 'Sin documento registrado'}
+              </p>
+            </div>
+            <button data-quitar="${a.id}" class="text-sm text-red-700 hover:underline">
+              Quitar
+            </button>
+          </div>`).join('');
+
+        caja.querySelectorAll('[data-quitar]').forEach((boton) => {
+          boton.addEventListener('click', async () => {
+            try {
+              await Api.del(
+                `/api/residentes/${residenteId}/autorizados-retiro/${boton.dataset.quitar}`);
+              avisar('aviso', 'Esa persona ya no puede retirar tus paquetes', 'ok');
+              cargarAutorizados();
+            } catch (e) {
+              avisar('aviso', textoDeError(e));
+            }
+          });
+        });
+      } catch (e) {
+        caja.innerHTML = `<p class="text-red-700">${esc(textoDeError(e))}</p>`;
+      }
+    }
+
+    async function autorizar(evento) {
+      evento.preventDefault();
+      const doc4 = document.getElementById('autDoc4').value.trim();
+      try {
+        const id = await miResidenteId();
+        await Api.post(`/api/residentes/${id}/autorizados-retiro`, {
+          nombre: document.getElementById('autNombre').value.trim(),
+          // Vacío es null y no "": el doc4 es opcional, pero un string vacío
+          // no pasaría el patrón de 4 dígitos del DTO y daría un 400.
+          doc4: doc4 === '' ? null : doc4,
+        });
+        document.getElementById('formAutorizado').reset();
+        avisar('aviso', 'Persona autorizada a retirar', 'ok');
+        cargarAutorizados();
+      } catch (e) {
+        avisar('aviso', textoDeError(e));
       }
     }
   </script>
