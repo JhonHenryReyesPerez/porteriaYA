@@ -48,6 +48,16 @@ porteria:
   cors:
     origenes:
       - http://localhost:8080
+  autorizaciones:
+    # Reintentos al generar el codigo de 6 digitos si choca con uno activo (§12)
+    intentos-generacion-codigo: 10
+    # Duracion esperada de permanencia por tipo, en minutos. El residente puede
+    # sobrescribirla al crear la autorizacion (§6, permanencia).
+    duracion-esperada-min-por-tipo:
+      VISITA: 180
+      DOMICILIARIO: 30
+      SERVICIO_RECURRENTE: 300
+      MUDANZA: 480
   aprobacion:
     timeout-minutos: 3
     token-vigencia-minutos: 10

@@ -45,6 +45,11 @@ public class GlobalErrorHandler {
         return respuesta(HttpStatus.TOO_MANY_REQUESTS, e.codigo(), e.getMessage());
     }
 
+    @ExceptionHandler(SolicitudInvalidaException.class)
+    public ResponseEntity<ApiError> solicitudInvalida(SolicitudInvalidaException e) {
+        return respuesta(HttpStatus.BAD_REQUEST, e.codigo(), e.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> validacion(MethodArgumentNotValidException e) {
         String detalle = e.getBindingResult().getFieldErrors().stream()

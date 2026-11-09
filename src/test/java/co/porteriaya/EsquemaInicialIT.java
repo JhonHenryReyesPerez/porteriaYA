@@ -8,13 +8,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
  * Red de seguridad del esquema: si alguien rompe la migracion V1 o una de las
@@ -23,13 +18,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * Necesita Docker: por eso es *IT y corre en ./mvnw verify, no en test.
  */
-@SpringBootTest
-@Testcontainers
-class EsquemaInicialIT {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17-alpine");
+class EsquemaInicialIT extends IntegracionBase {
 
     private static final List<String> TABLAS_ESPERADAS = List.of(
             "autorizacion", "autorizado_retiro", "bitacora", "consulta_rag", "documento",

@@ -57,7 +57,7 @@ Las clases `*IT` son las de integración y solo corren en `verify`.
 El orden de construcción está en `CLAUDE.md` §17.
 
 - [x] **1. Infraestructura y esqueleto** — Compose, esqueleto Spring, Flyway con el esquema V1, semilla de demo
-- [ ] 2. Entidades, autorizaciones con recurrencia, validación con uso atómico, bitácora
+- [x] **2. Entidades, autorizaciones con recurrencia, validación con uso atómico, bitácora**
 - [ ] 3. Ingresos y salidas, solicitud no anunciada con token, paquetes, `@Scheduled`, eventos
 - [ ] 4. No permitidas, `/dashboard/stats`, Swagger completo
 - [ ] 5. n8n: aprobación en vivo, paquetes, alertas de seguridad
@@ -66,7 +66,9 @@ El orden de construcción está en `CLAUDE.md` §17.
 - [ ] 8. Chat en la UI y flujos 5 a 7 de n8n
 - [ ] 9. Documentación y capturas
 
-Pendiente del paso 1: `POST /api/demo/avanzar` todavía no existe. El reloj simulado del perfil
+Lo que el paso 2 deja a medias a propósito: el paso 5 de la validación (`YA_DENTRO`) necesita
+el repositorio de ingresos, y los eventos hacia n8n necesitan el publicador; las dos cosas llegan
+en el paso 3. `POST /api/demo/avanzar` tampoco existe todavía. El reloj simulado del perfil
 `demo` ya está, pero el endpoint debe además disparar la pasada del scheduler (§9), y el
 scheduler nace en el paso 3.
 

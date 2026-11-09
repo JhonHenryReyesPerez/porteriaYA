@@ -1,7 +1,9 @@
 package co.porteriaya.config;
 
 import java.util.List;
+import java.util.Map;
 
+import co.porteriaya.autorizacion.entity.TipoAutorizacion;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -13,6 +15,7 @@ public record PorteriaProperties(
         String baseUrl,
         Admin admin,
         Cors cors,
+        Autorizaciones autorizaciones,
         Aprobacion aprobacion,
         Permanencia permanencia,
         Paquete paquete,
@@ -24,6 +27,24 @@ public record PorteriaProperties(
     }
 
     public record Cors(List<String> origenes) {
+    }
+
+    /**
+     * Defaults de la autorizacion. La duracion esperada depende del tipo: un
+     * domiciliario y una mudanza no pueden compartir el mismo valor. El
+     * residente puede sobrescribirla en el formulario.
+     */
+    public record Autorizaciones(Map<TipoAutorizacion, Integer> duracionEsperadaMinPorTipo,
+                                 int intentosGeneracionCodigo) {
+
+        public int duracionPorDefecto(TipoAutorizacion tipo) {
+            Integer valor = duracionEsperadaMinPorTipo.get(tipo);
+            if (valor == null) {
+                throw new IllegalStateException(
+                        "Falta porteria.autorizaciones.duracion-esperada-min-por-tipo." + tipo);
+            }
+            return valor;
+        }
     }
 
     /** Ventana de respuesta del residente a una visita no anunciada (§6). */

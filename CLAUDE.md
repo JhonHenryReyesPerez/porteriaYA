@@ -143,7 +143,7 @@ Esto introduce **advertencias** en la respuesta de `validar`, distintas de un re
 - Visita no anunciada: el vigilante la registra como **`SolicitudNoAnunciada`** (entidad propia, no un Ingreso) y se pide aprobación al residente. Tiempo límite de respuesta: 3 minutos (configurable). El enlace de aprobación usa **token aleatorio de un solo uso con vencimiento**.
 - El `Ingreso` de una visita no anunciada **solo se crea si la solicitud queda Aprobada** (o Autorizada por vigilante tras Sin respuesta). Así la regla «si el residente rechaza, el vigilante no puede registrar el ingreso» se cumple por construcción. Solo la administración puede anular una decisión.
 - Token de aprobación: se guarda **hasheado** (nunca en claro), con `vence_en` y `usado_en`. `GET /api/aprobacion/{token}` **no muta**: devuelve una página de confirmación. La decisión se aplica en `POST /api/aprobacion/{token}`, porque los clientes de correo pre-cargan enlaces y un prefetch quemaría el token.
-- Permanencia: cada autorización define una duración esperada (`duracion_esperada_min`, campo de `Autorizacion` que el residente diligencia en el formulario); superarla en más de 30 minutos emite `PERMANENCIA_EXCEDIDA` una sola vez.
+- Permanencia: cada autorización define una duración esperada (`duracion_esperada_min`). El valor **por defecto depende del tipo** y vive en `porteria.autorizaciones.duracion-esperada-min-por-tipo` (visita 180, domiciliario 30, servicio recurrente 300, mudanza 480); el residente puede sobrescribirlo en el formulario. Superarla en más de 30 minutos emite `PERMANENCIA_EXCEDIDA` una sola vez.
 - Paquetes: recordatorios a las 24 h y 72 h; escalamiento a administración a los 7 días (todo configurable); cada aviso con su bandera para no repetirse.
 - Retiro de paquetes: con el código del correo o por una persona registrada como autorizada a retirar.
 - Paquete para apartamento inexistente o inactivo: no se registra.
@@ -157,7 +157,9 @@ Esto introduce **advertencias** en la respuesta de `validar`, distintas de un re
 | Paquete | Recibido → Entregado \| Devuelto (banderas: recordatorio 24 h, 72 h, escalado) |
 | Documento | Subido → Indexando → Indexado \| Error; además **Error → Indexando** (reintento) e **Indexado → Indexando** (`POST /api/rag/reindexar` o versión nueva) |
 
-Salto inválido → **409**. Todo cambio relevante se escribe en `Bitacora`, que **no se puede editar ni borrar desde la API** (sin endpoints PUT/PATCH/DELETE y sin `@Setter` público en la entidad).
+Salto inválido → **409**, y eso incluye **repetir el estado actual**: cancelar dos veces la misma autorización es un error del cliente y se ve como 409, no como un 200 silencioso. Quien decide si toca cambiar de estado es el service; la entidad solo comprueba que el salto exista en el mapa.
+
+Todo cambio relevante se escribe en `Bitacora`, que **no se puede editar ni borrar desde la API** (sin endpoints PUT/PATCH/DELETE y sin `@Setter` público en la entidad).
 
 ### Privacidad (Ley 1581 de 2012)
 - Se guarda solo el **nombre y los últimos 4 dígitos** del documento. Nunca el documento completo.
@@ -356,6 +358,5 @@ Residente autoriza a un amigo y recibe el código → vigilante valida y el resi
 
 Pregunta antes de implementar cualquiera de estas; no las resuelvas por tu cuenta.
 
-1. **`duracion_esperada_min`:** ¿valor por defecto según el tipo de autorización, o lo escribe el residente siempre? Un domiciliario y una mudanza no pueden compartir default.
-2. **Anulación por administración:** qué ruta la expone y qué efecto tiene sobre una solicitud ya Rechazada o Denegada (¿crea el ingreso, reabre la solicitud?).
-3. **Una sola instancia de la app.** El `@Scheduled` no lleva bloqueo distribuido; con dos instancias las tareas se duplicarían. Asumido como una sola instancia; confirmar que basta para la entrega.
+1. **Anulación por administración:** qué ruta la expone y qué efecto tiene sobre una solicitud ya Rechazada o Denegada (¿crea el ingreso, reabre la solicitud?).
+2. **Una sola instancia de la app.** El `@Scheduled` no lleva bloqueo distribuido; con dos instancias las tareas se duplicarían. Asumido como una sola instancia; confirmar que basta para la entrega.
